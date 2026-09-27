@@ -1,0 +1,32 @@
+# Environment & secrets
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.venv/
+venv/
+ENV/
+
+# Local databases & data
+backend/data/*.db
+*.sqlite
+*.sqlite3
+*.db
+
+# Node & Next.js
+node_modules/
+.next/
+out/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
