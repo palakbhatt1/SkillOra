@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+:root {
+  --background: #FAF9F5;
+  --foreground: #141A16;
+}
+
+@theme {
+  --font-serif: var(--font-serif), Georgia, Cambria, serif;
+  --font-sans: var(--font-sans), system-ui, -apple-system, sans-serif;
+  --color-brand-primary: #1E6B38;
+  --color-brand-accent: #2E9B4E;
+  --color-brand-light: #EAF4EB;
+  --color-cream: #FAF9F5;
+}
+
+body {
+  background-color: #FAF9F5;
+  color: #141A16;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0.5deg);
+  }
+}
+
+@keyframes floatReverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(8px) rotate(-0.5deg);
+  }
+}
+
+.animate-float-1 {
+  animation: floatSlow 7s ease-in-out infinite;
+}
+
+.animate-float-2 {
+  animation: floatReverse 8s ease-in-out infinite;
+}
+
+/* Ensure Next.js dev overlay indicator doesn't obscure the pristine mockup layout */
+nextjs-portal,
+[data-nextjs-toast],
+[data-nextjs-dev-overlay],
+#next-logo-indicator {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
