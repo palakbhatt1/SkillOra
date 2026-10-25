@@ -1,205 +1,351 @@
 "use client";
+
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
-import { PageHead } from "@/components/AppShell";
-import { gsap, useGSAP } from "@/lib/gsap";
+import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import type { Fact, FactStatus } from "@/lib/data";
 
 type Tab = "all" | "review" | FactStatus;
-const tabLabels: Record<string, string> = { all: "All", review: "Needs review", verified: "Confirmed", stale: "Stale", rejected: "Rejected" };
-const tabs: Tab[] = ["all", "review", "verified", "stale", "rejected"];
-const tone: Record<FactStatus, string> = { pending: "amber", verified: "green", stale: "rose", rejected: "" };
-const matches = (f: Fact, t: Tab) => t === "all" || (t === "review" ? f.status === "pending" || f.status === "stale" : f.status === t);
+const tabs: { id: Tab; label: string }[] = [
+  { id: "all", label: "All Facts" },
+  { id: "review", label: "Needs Review" },
+  { id: "verified", label: "Verified" },
+  { id: "pending", label: "Pending" },
+  { id: "stale", label: "Stale" },
+  { id: "rejected", label: "Rejected" },
+];
 
-export default function Verify() {
-  const { facts, setFactStatus, editFact, declareSkill, confirmGroup, rejectGroup, live } = useStore();
-  const [skill, setSkill] = useState("");
+const matches = (f: Fact, t: Tab) => {
+  if (t === "all") return true;
+  if (t === "review") return f.status === "pending" || f.status === "stale";
+  return f.status === t;
+};
+
+export default function VerifyPage() {
+  const { facts, setFactStatus, editFact, declareSkill, confirmGroup } = useStore();
   const [tab, setTab] = useState<Tab>("all");
-  const [open, setOpen] = useState<Record<string, boolean>>({});
-  const [editing, setEditing] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
-  const list = useRef<HTMLDivElement>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [newSkill, setNewSkill] = useState("");
 
-  const count = (t: Tab) => facts.filter((f) => matches(f, t)).length;
-  const auto = facts.filter((f) => f.auto).length;
-  const pending = facts.filter((f) => f.status === "pending").length;
-  const confirmed = facts.filter((f) => f.status === "verified").length;
-  const pct = facts.length ? Math.round((confirmed / facts.length) * 100) : 0;
+  const pendingCount = facts.filter((f) => f.status === "pending").length;
+  const verifiedCount = facts.filter((f) => f.status === "verified").length;
+  const pct = facts.length ? Math.round((verifiedCount / facts.length) * 100) : 0;
 
-  // group by project / role / "Skills"; groups that need attention first, Skills last
-  const groups = useMemo(() => {
-    const m = new Map<string, Fact[]>();
-    facts.filter((f) => matches(f, tab) && f.project !== "Skills").forEach((f) => m.set(f.project, [...(m.get(f.project) ?? []), f]));
-    return [...m.entries()]
-      .map(([name, fs]) => ({ name, fs, all: facts.filter((f) => f.project === name) }))
-      .sort((a, b) => Number(a.name === "Skills") - Number(b.name === "Skills") ||
-        b.all.filter((f) => f.status === "pending").length - a.all.filter((f) => f.status === "pending").length);
+  const filteredFacts = useMemo(() => {
+    return facts.filter((f) => matches(f, tab));
   }, [facts, tab]);
 
-  // ---- Skills section: every skill in one place (from the skills list + self-declared), plus tech used per project
-  const skillFacts = facts.filter((f) => f.project === "Skills" && f.status !== "rejected");
-  const skillLabel = (f: Fact) => f.span || f.text.replace(/^Skilled in /, "");
-  const pendingSkills = skillFacts.filter((f) => f.status === "pending" || f.status === "stale").length;
-  const techByProject = useMemo(() => {
-    const m = new Map<string, Set<string>>();
-    facts.filter((f) => f.status !== "rejected" && f.text.startsWith("Built with ")).forEach((f) =>
-      f.text.slice("Built with ".length).split(",").map((t) => t.trim()).filter(Boolean).forEach((t) => m.set(t, (m.get(t) ?? new Set()).add(f.project))));
-    return [...m.entries()].sort((a, b) => b[1].size - a[1].size || a[0].localeCompare(b[0]));
-  }, [facts]);
+  // Group facts by project
+  const projectGroups = useMemo(() => {
+    const map = new Map<string, Fact[]>();
+    filteredFacts.forEach((f) => {
+      const p = f.project || "General";
+      map.set(p, [...(map.get(p) ?? []), f]);
+    });
+    return [...map.entries()];
+  }, [filteredFacts]);
 
-  const isOpen = (name: string, needs: number) => open[name] ?? (needs > 0 || tab !== "all");
+  const handleStartEdit = (f: Fact) => {
+    setEditingId(f.id);
+    setEditText(f.text);
+  };
 
-  useGSAP(() => {
-    gsap.fromTo(".group", { y: 24, opacity: 0 }, { y: 0, opacity: 1, stagger: 0.05, duration: 0.5, ease: "power3.out", overwrite: true });
-  }, { scope: list, dependencies: [tab, groups.length] });
+  const handleSaveEdit = async (id: string) => {
+    if (!editText.trim()) return;
+    await editFact(id, editText.trim());
+    setEditingId(null);
+  };
 
-  const flash = (id: string, color: string) =>
-    gsap.fromTo(`#fact-${id}`, { boxShadow: `0 0 0 0.35rem ${color}` }, { boxShadow: "0 0 0 0 transparent", duration: 0.9, ease: "power2.out" });
-  const decide = (id: string, s: FactStatus) => {
-    setFactStatus(id, s);
-    flash(id, s === "verified" ? "rgba(245,158,11,.5)" : "rgba(234,88,12,.5)");
+  const handleAddSkill = async () => {
+    if (!newSkill.trim()) return;
+    await declareSkill(newSkill.trim());
+    setNewSkill("");
   };
 
   return (
-    <div>
-      <PageHead step={2} title="Verify Facts" sub="Facts quoted from your own files are confirmed for you — skim them, reject anything wrong, and confirm the few that contain numbers.">
-        <Link href="/job" className="btn primary">Continue to New Job →</Link>
-      </PageHead>
+    <div className="space-y-8 max-w-5xl mx-auto">
+      
+      {/* Header section */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#1E6B38] bg-[#EAF4EB] px-2.5 py-0.5 rounded-full border border-[#C5E1CB]">
+              Stage 2 · Grounding Engine
+            </span>
+            <span className="text-xs text-[#78827A]">Local SQLite Fact Ledger</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-serif font-normal text-[#141A16] tracking-tight">
+            Verify Fact Ledger
+          </h1>
+          <p className="text-sm text-[#556056] max-w-2xl leading-relaxed">
+            Every bullet point generated on your resume is strictly grounded in these verified facts. Review extracted claims and their verbatim source spans.
+          </p>
+        </div>
 
-      <div className="card flat" data-in style={{ marginBottom: "1.6rem" }}>
-        <div className="row between wrapflex" style={{ gap: "1.4rem" }}>
-          <div style={{ flex: "1 1 18rem" }}>
-            <div className="row between"><b>{confirmed} of {facts.length} facts confirmed</b><b>{pct}%</b></div>
-            <div className="bar" style={{ marginTop: ".6rem" }}><i style={{ width: `${pct}%`, transition: "width .7s cubic-bezier(.2,.8,.2,1)" }} /></div>
-            <p className="muted small" style={{ marginTop: ".6rem" }}>
-              {auto > 0 && <>{auto} auto-confirmed from your files · </>}{pending} need{pending === 1 ? "s" : ""} your review
+        <Link
+          href="/job"
+          className="px-6 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs sm:text-sm shadow-md transition-all shrink-0 flex items-center gap-1.5 self-start sm:self-auto"
+        >
+          <span>Proceed to Job Match</span>
+          <span>→</span>
+        </Link>
+      </div>
+
+      {/* Progress & Verification Overview Card */}
+      <div className="bg-white p-6 rounded-2xl border border-[#ECE7DD] shadow-[0_2px_14px_rgba(0,0,0,0.02)] space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1.5 flex-1 max-w-lg">
+            <div className="flex items-center justify-between text-xs sm:text-sm font-bold text-[#141A16]">
+              <span>Grounding Ledger Health</span>
+              <span className="text-[#1E6B38] font-mono">{verifiedCount} of {facts.length} Verified ({pct}%)</span>
+            </div>
+            
+            <div className="w-full h-2.5 bg-[#FAF7F0] border border-[#ECE7DD] rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-[#2E9B4E] to-[#1E6B38] rounded-full transition-all duration-700"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+
+            <p className="text-xs text-[#78827A]">
+              {pendingCount > 0 ? (
+                <span>⚠️ {pendingCount} claims await your review before resume tailoring.</span>
+              ) : (
+                <span className="text-[#1E6B38] font-semibold">✓ All extracted claims are verified and ready for tailoring.</span>
+              )}
             </p>
           </div>
-          {pending > 0 && <button className="btn good" onClick={() => confirmGroup(null)}>Confirm all {pending} pending</button>}
-        </div>
-        <div className="tabs" style={{ marginTop: "1.2rem" }}>
-          {tabs.map((t) => (
-            <button key={t} className={`tab ${tab === t ? "on" : ""}`} onClick={() => setTab(t)}>{tabLabels[t]} · {count(t)}</button>
-          ))}
+
+          {pendingCount > 0 && (
+            <button
+              onClick={() => confirmGroup(null)}
+              className="px-4 py-2 bg-[#EAF4EB] hover:bg-[#D5EED8] text-[#1E6B38] border border-[#C5E1CB] rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer self-start sm:self-center"
+            >
+              ✓ Verify All {pendingCount} Pending Claims
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="card flat" data-in style={{ marginBottom: "1.6rem" }}>
-        <div className="row between wrapflex" style={{ gap: "1rem" }}>
-          <div>
-            <h3 className="h3">Your skills <span className="muted" style={{ fontWeight: 400 }}>· {skillFacts.length}</span></h3>
-            <p className="muted small">Every skill found in your files. Click an amber skill to confirm it, ✕ to remove one that is wrong.</p>
-          </div>
-          {pendingSkills > 0 && <button className="btn sm good" onClick={() => confirmGroup("Skills")}>Confirm {pendingSkills} pending</button>}
-        </div>
-        <div className="row wrapflex" style={{ gap: ".5rem", marginTop: "1rem" }}>
-          {skillFacts.map((f) => {
-            const needs = f.status === "pending" || f.status === "stale";
+      {/* Filter Tabs & Add Custom Skill Row */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+          {tabs.map((t) => {
+            const count = facts.filter((f) => matches(f, t.id)).length;
+            const isActive = tab === t.id;
             return (
-              <span key={f.id} className={`chip skill-chip ${f.declared ? "amber" : needs ? "amber" : "green"}`} style={{ fontSize: ".9rem", padding: ".35rem .5rem .35rem .8rem", gap: ".5rem" }}>
-                <button onClick={() => needs && setFactStatus(f.id, "verified")} style={{ cursor: needs ? "pointer" : "default" }} title={needs ? "Click to confirm" : f.declared ? "Self-declared - no source proof" : "Confirmed"}>
-                  {skillLabel(f)}{f.declared ? " · declared" : ""}
-                </button>
-                <button onClick={() => setFactStatus(f.id, "rejected")} aria-label={`Remove ${skillLabel(f)}`} title="Remove" style={{ opacity: 0.7 }}>✕</button>
-              </span>
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                  isActive
+                    ? "bg-[#1E6B38] text-white shadow-sm"
+                    : "bg-white text-[#556056] border border-[#ECE7DD] hover:bg-[#FAF9F5]"
+                }`}
+              >
+                <span>{t.label}</span>
+                <span className={`ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] ${
+                  isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                }`}>
+                  {count}
+                </span>
+              </button>
             );
           })}
-          {skillFacts.length === 0 && <span className="muted small">No skills yet. Upload a resume with a skills section, or declare one below.</span>}
         </div>
 
-        {live && (
-          <div className="row wrapflex" style={{ gap: ".7rem", marginTop: "1.2rem" }}>
-            <input className="input" style={{ maxWidth: "18rem" }} placeholder="Add a skill you know, e.g. Docker" value={skill} onChange={(e) => setSkill(e.target.value)}
-              onKeyDown={async (e) => { if (e.key === "Enter" && skill.trim()) { await declareSkill(skill.trim()); setSkill(""); } }} />
-            <button className="btn sm" disabled={!skill.trim()} onClick={async () => { await declareSkill(skill.trim()); setSkill(""); }}>Add skill</button>
-            <span className="muted small" style={{ flex: "1 1 14rem" }}>Added skills count at lower weight and are marked &quot;declared&quot; — never turned into an invented bullet.</span>
-          </div>
-        )}
-
-        {techByProject.length > 0 && (
-          <div style={{ marginTop: "1.4rem", paddingTop: "1.2rem", borderTop: "1px solid var(--line)" }}>
-            <b>Used in your projects</b>
-            <p className="muted small">Technologies taken from the “Built with …” line of each project.</p>
-            <div className="row wrapflex" style={{ gap: ".5rem", marginTop: ".8rem" }}>
-              {techByProject.map(([tech, ps]) => (
-                <span key={tech} className="chip blue" title={[...ps].join(", ")} style={{ fontSize: ".85rem" }}>{tech}{ps.size > 1 ? ` ×${ps.size}` : ""}</span>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Quick Add Custom Skill */}
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={newSkill}
+            onChange={(e) => setNewSkill(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddSkill()}
+            placeholder="+ Declare custom skill"
+            className="h-8 px-3 rounded-lg border border-[#E5E1D5] bg-white text-xs text-[#141A16] placeholder:text-[#9DA69E] focus:outline-none focus:border-[#1E6B38]"
+          />
+          <button
+            onClick={handleAddSkill}
+            disabled={!newSkill.trim()}
+            className="h-8 px-3 rounded-lg bg-[#1E6B38] hover:bg-[#16532B] disabled:opacity-40 text-white text-xs font-semibold"
+          >
+            Add
+          </button>
+        </div>
       </div>
 
-      <div className="stack" ref={list}>
-        {groups.map(({ name, fs, all }) => {
-          const needs = all.filter((f) => f.status === "pending").length;
-          const stale = all.filter((f) => f.status === "stale").length;
-          const role = all.some((f) => f.kind === "role");
-          const expanded = isOpen(name, needs + stale);
-          return (
-            <div key={name} className="card flat group" style={{ padding: 0, overflow: "hidden" }}>
-              <div className="row between group-head" style={{ padding: "1.1rem 1.4rem", gap: "1rem" }}>
-                <button className="row" style={{ gap: ".8rem", textAlign: "left", flex: "1 1 14rem", minWidth: 0 }} onClick={() => setOpen({ ...open, [name]: !expanded })} aria-expanded={expanded}>
-                  <span className="chip mono">{expanded ? "▾" : "▸"}</span>
-                  <span>
-                    <b style={{ fontSize: "1.1rem" }}>{name}</b>
-                    <span className="muted small" style={{ display: "block" }}>
-                      {all.length} fact{all.length === 1 ? "" : "s"}
-                      {all.filter((f) => f.auto).length > 0 && ` · ${all.filter((f) => f.auto).length} auto-confirmed`}
-                    </span>
-                  </span>
-                </button>
-                <div className="row wrapflex" style={{ gap: ".5rem" }}>
-                  {role && <span className="chip violet">job / role</span>}
-                  {needs > 0 && <span className="chip amber">{needs} to review</span>}
-                  {stale > 0 && <span className="chip rose">{stale} stale</span>}
-                  {needs === 0 && stale === 0 && <span className="chip green">✓ all confirmed</span>}
-                  {needs > 0 && <button className="btn sm good" onClick={() => confirmGroup(name)}>Confirm {needs}</button>}
-                  <button className="btn sm bad" onClick={() => { if (window.confirm(`Reject all ${all.length} facts in "${name}"? They will not be used in any resume.`)) rejectGroup(name); }}>Reject all</button>
+      {/* Grouped Claims List */}
+      {projectGroups.length === 0 ? (
+        <div className="bg-white p-12 text-center rounded-2xl border border-[#ECE7DD] space-y-3">
+          <span className="text-3xl">📭</span>
+          <p className="text-sm font-bold text-[#141A16]">No facts found under "{tab}"</p>
+          <Link href="/sources" className="inline-block text-xs font-semibold text-[#1E6B38] hover:underline">
+            + Add more sources in Stage 1
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {projectGroups.map(([projectName, groupFacts]) => (
+            <div key={projectName} className="bg-white rounded-2xl border border-[#ECE7DD] shadow-[0_2px_14px_rgba(0,0,0,0.02)] overflow-hidden">
+              
+              {/* Project Group Header */}
+              <div className="bg-[#FAF9F5] px-6 py-3.5 border-b border-[#ECE7DD] flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base">📁</span>
+                  <h3 className="text-sm font-serif font-bold text-[#141A16]">{projectName}</h3>
                 </div>
+                <span className="text-xs font-semibold text-[#78827A] bg-white border border-[#ECE7DD] px-2.5 py-0.5 rounded-full">
+                  {groupFacts.length} claims
+                </span>
               </div>
 
-              {expanded && (
-                <div className="stack" style={{ padding: "0 1.4rem 1.4rem", gap: ".7rem" }}>
-                  {fs.map((f) => (
-                    <div key={f.id} id={`fact-${f.id}`} className="fact" style={{ borderTop: "1px solid var(--line)", paddingTop: ".9rem" }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div className="row wrapflex" style={{ gap: ".5rem", marginBottom: ".5rem" }}>
-                          <span className="chip mono">{f.id}</span>
-                          <span className={`chip ${tone[f.status]}`}>{f.status === "verified" && f.auto ? "auto-confirmed" : f.status === "verified" ? "confirmed" : f.status}</span>
-                          <span className="chip">{f.category}</span>
-                          {f.declared && <span className="chip amber">self-declared · no source proof</span>}
+              {/* Facts Rows */}
+              <div className="divide-y divide-[#F0EDE6]">
+                {groupFacts.map((fact) => {
+                  const isVerified = fact.status === "verified";
+                  const isPending = fact.status === "pending";
+                  const isStale = fact.status === "stale";
+                  const isRejected = fact.status === "rejected";
+
+                  return (
+                    <div key={fact.id} className="p-5 sm:p-6 space-y-3 hover:bg-[#FAF9F6]/50 transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        
+                        {/* Claim Text and Edit Form */}
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#FAF9F5] border border-[#E5E1D5] text-[#1E6B38]">
+                              {fact.category || "EXPERIENCE"}
+                            </span>
+                            <span className="text-xs text-[#78827A] font-mono">{fact.id}</span>
+                          </div>
+
+                          {editingId === fact.id ? (
+                            <div className="space-y-2 pt-1">
+                              <textarea
+                                value={editText}
+                                onChange={(e) => setEditText(e.target.value)}
+                                rows={2}
+                                className="w-full p-2.5 text-xs sm:text-sm border border-[#1E6B38] rounded-xl bg-white focus:outline-none"
+                              />
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleSaveEdit(fact.id)}
+                                  className="px-3 py-1 bg-[#1E6B38] text-white text-xs font-bold rounded-lg"
+                                >
+                                  Save Edit
+                                </button>
+                                <button
+                                  onClick={() => setEditingId(null)}
+                                  className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="group">
+                              <p className="text-xs sm:text-sm font-semibold text-[#141A16] leading-relaxed">
+                                {fact.text}
+                              </p>
+                              <button
+                                onClick={() => handleStartEdit(fact)}
+                                className="text-[11px] text-[#78827A] hover:text-[#1E6B38] mt-1 inline-flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity"
+                              >
+                                <span>✎ Edit claim</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        {editing === f.id ? (
-                          <textarea className="input" rows={2} value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus />
-                        ) : (
-                          <p style={{ fontWeight: 500 }}>{f.text}</p>
-                        )}
-                        {f.span && f.span !== f.text && <div className="span small"><span className="muted">{f.source}</span><br />{f.span}</div>}
+
+                        {/* Status Badge & Action Buttons */}
+                        <div className="flex items-center gap-2 self-start shrink-0">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold capitalize ${
+                            isVerified
+                              ? "bg-[#EAF4EB] text-[#1E6B38] border border-[#C5E1CB]"
+                              : isPending
+                              ? "bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]"
+                              : isStale
+                              ? "bg-[#FFEDD5] text-[#9A3412] border border-[#FED7AA]"
+                              : "bg-[#FEE2E2] text-[#991B1B] border border-[#FECACA]"
+                          }`}>
+                            {fact.status}
+                          </span>
+
+                          <div className="flex items-center gap-1.5 pl-2 border-l border-[#ECE7DD]">
+                            {!isVerified && (
+                              <button
+                                onClick={() => setFactStatus(fact.id, "verified")}
+                                className="px-2.5 py-1 rounded-lg bg-[#1E6B38] hover:bg-[#16532B] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+                              >
+                                Verify
+                              </button>
+                            )}
+                            {!isPending && (
+                              <button
+                                onClick={() => setFactStatus(fact.id, "pending")}
+                                className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition-all"
+                              >
+                                Revert
+                              </button>
+                            )}
+                            {!isRejected && (
+                              <button
+                                onClick={() => setFactStatus(fact.id, "rejected")}
+                                className="px-2 py-1 rounded-lg hover:bg-rose-50 text-rose-600 text-xs font-medium transition-all"
+                              >
+                                Reject
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
                       </div>
-                      <div className="fact-actions">
-                        {editing === f.id ? (
-                          <>
-                            <button className="btn sm good" onClick={() => { editFact(f.id, draft); setEditing(null); flash(f.id, "rgba(245,158,11,.5)"); }}>Save</button>
-                            <button className="btn sm" onClick={() => setEditing(null)}>Cancel</button>
-                          </>
-                        ) : (
-                          <>
-                            {f.status !== "verified" && <button className="btn sm good" onClick={() => decide(f.id, "verified")} aria-label="Confirm">✓ Confirm</button>}
-                            <button className="btn sm warn" onClick={() => { setEditing(f.id); setDraft(f.text); }} aria-label="Edit">✎ Edit</button>
-                            {f.status !== "rejected" && <button className="btn sm bad" onClick={() => decide(f.id, "rejected")} aria-label="Reject">✕</button>}
-                          </>
-                        )}
-                      </div>
+
+                      {/* Source Citation Span Box */}
+                      {fact.span && (
+                        <div className="bg-[#FAF9F5] p-3 rounded-xl border border-[#ECE7DD] text-xs font-mono text-[#556056] leading-relaxed flex items-start justify-between gap-3">
+                          <div>
+                            <span className="text-[#1E6B38] font-bold">Citation: </span>
+                            <span>"{fact.span}"</span>
+                          </div>
+                          {fact.source && (
+                            <span className="text-[10px] text-[#78827A] shrink-0 font-sans bg-white px-2 py-0.5 rounded border border-[#E5E1D5]">
+                              {fact.source}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
+
             </div>
-          );
-        })}
-        {groups.length === 0 && <div className="card flat muted" style={{ textAlign: "center" }}>{facts.length ? "Nothing here — all clear." : "No facts yet. Add a resume, GitHub repo or note on Add Sources."}</div>}
+          ))}
+        </div>
+      )}
+
+      {/* Bottom Navigation */}
+      <div className="pt-4 flex items-center justify-between border-t border-[#ECE7DD]">
+        <Link
+          href="/sources"
+          className="text-xs font-semibold text-[#556056] hover:text-[#141A16] flex items-center gap-1"
+        >
+          <span>← Back to Sources</span>
+        </Link>
+
+        <Link
+          href="/job"
+          className="px-6 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-1.5"
+        >
+          <span>Continue to Job Match</span>
+          <span>→</span>
+        </Link>
       </div>
+
     </div>
   );
 }

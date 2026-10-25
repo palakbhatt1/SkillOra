@@ -1,45 +1,51 @@
 "use client";
-import { useRef } from "react";
-import { gsap, useGSAP } from "@/lib/gsap";
 
-export default function ScoreRing({ value, size = 22 }: { value: number; size?: number }) {
-  const arc = useRef<SVGCircleElement>(null);
-  const num = useRef<HTMLElement>(null);
-  const state = useRef({ v: 0 });
-  const R = 54;
+export default function ScoreRing({ value, size = 180 }: { value: number; size?: number }) {
+  const R = 70;
   const C = 2 * Math.PI * R;
+  const strokeDashoffset = C * (1 - Math.min(Math.max(value, 0), 100) / 100);
 
-  useGSAP(
-    () => {
-      gsap.to(state.current, {
-        v: value,
-        duration: 1.6,
-        ease: "power3.out",
-        onUpdate: () => {
-          const v = state.current.v;
-          if (arc.current) arc.current.style.strokeDashoffset = String(C * (1 - v / 100));
-          if (num.current) num.current.textContent = String(Math.round(v));
-        },
-      });
-    },
-    { dependencies: [value] }
-  );
+  // Dynamic color depending on ATS score
+  const strokeColor = value >= 80 ? "#1E6B38" : value >= 60 ? "#D97706" : "#DC2626";
 
   return (
-    <div className="ring-wrap" style={{ width: `${size}rem`, height: `${size}rem` }}>
-      <svg viewBox="0 0 120 120" width="100%" height="100%" style={{ transform: "rotate(-90deg)" }}>
-        <defs>
-          <linearGradient id="rg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#fdba74" />
-            <stop offset="1" stopColor="#f97316" />
-          </linearGradient>
-        </defs>
-        <circle cx="60" cy="60" r={R} fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="9" />
-        <circle ref={arc} className="progress-ring" cx="60" cy="60" r={R} fill="none" stroke="url(#rg)" strokeWidth="9" strokeDasharray={C} strokeDashoffset={C} />
+    <div 
+      className="relative flex items-center justify-center shrink-0" 
+      style={{ width: `${size}px`, height: `${size}px` }}
+    >
+      <svg 
+        viewBox="0 0 160 160" 
+        className="w-full h-full -rotate-90 transform"
+      >
+        <circle 
+          cx="80" 
+          cy="80" 
+          r={R} 
+          fill="none" 
+          stroke="#EBE7DD" 
+          strokeWidth="12" 
+        />
+        <circle 
+          cx="80" 
+          cy="80" 
+          r={R} 
+          fill="none" 
+          stroke={strokeColor} 
+          strokeWidth="12" 
+          strokeDasharray={C} 
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          className="transition-all duration-1000 ease-out"
+        />
       </svg>
-      <div className="num">
-        <b ref={num}>0</b>
-        <span className="muted small">/ 100 job-fit</span>
+      
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+        <span className="text-4xl font-serif font-bold text-[#141A16] tracking-tight">
+          {Math.round(value)}
+        </span>
+        <span className="text-[11px] font-semibold text-[#6B756E] uppercase tracking-wider mt-0.5">
+          ATS Score
+        </span>
       </div>
     </div>
   );

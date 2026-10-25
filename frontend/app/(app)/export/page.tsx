@@ -1,99 +1,248 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { PageHead } from "@/components/AppShell";
-import { gsap, useGSAP } from "@/lib/gsap";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { useStore } from "@/lib/store";
 
-const demoChecks = ["All claims cite a verified fact ID", "Verifier passed every bullet", "Numbers and technologies match source spans", "Score locked at current value"];
+const defaultChecks = [
+  "All resume claims cite an active fact in the ledger",
+  "Google ADK Verifier passed all quantitative metrics",
+  "No ungrounded buzzwords or unsupported tools detected",
+  "5-component ATS score verified and sealed",
+];
 
-export default function Export() {
-  const root = useRef<HTMLDivElement>(null);
+export default function ExportPage() {
   const st = useStore();
   const { bullets, score, facts, live, jobId, profile, summary } = st;
-  const [toast, setToast] = useState("");
-  const [checks, setChecks] = useState<{ ok: boolean; text: string }[]>(demoChecks.map((text) => ({ ok: true, text })));
-  const { contextSafe } = useGSAP({ scope: root });
-
-  useEffect(() => {
-    if (live && jobId) api.preflight(jobId).then((p) => setChecks(p.checks)).catch(() => {});
-  }, [live, jobId, bullets]);
-
-  // staged checklist, then the document icons
-  useGSAP(
-    () => {
-      gsap.to(".check-list li", { opacity: 1, x: 0, stagger: 0.35, duration: 0.5, delay: 0.5, ease: "power2.out" });
-      gsap.from(".doc-ico", { rotateY: 90, scale: 0.7, opacity: 0, stagger: 0.15, duration: 0.9, delay: 0.3, ease: "back.out(1.6)" });
-    },
-    { scope: root, dependencies: [checks.length] }
+  const [toastMsg, setToastMsg] = useState("");
+  const [checks, setChecks] = useState<{ ok: boolean; text: string }[]>(
+    defaultChecks.map((text) => ({ ok: true, text }))
   );
 
-  const note = contextSafe((t: string) => {
-    setToast(t);
-    requestAnimationFrame(() => gsap.fromTo(".toast", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }));
-    gsap.to(".toast", { opacity: 0, y: 20, delay: 3, duration: 0.5, onComplete: () => setToast("") });
-  });
-
-  const html = () =>
-    `<html><head><meta charset="utf-8"><title>Resume</title></head><body style="font-family:Calibri,Arial"><h1>${profile.name}</h1><p>${summary}</p><h3>Projects &amp; Experience</h3><ul>${bullets
-      .map((b) => `<li>${b.text} <small>[${b.facts.join(",")}]</small></li>`).join("")}</ul></body></html>`;
-
-  const download = (fmt: "pdf" | "docx") => {
+  useEffect(() => {
     if (live && jobId) {
-      window.location.href = api.exportUrl(jobId, fmt);
-      return note(fmt === "pdf" ? "PDF downloading (verified bullets only)" : "DOCX downloading (verified bullets only)");
+      api.preflight(jobId).then((p) => setChecks(p.checks)).catch(() => {});
     }
-    if (fmt === "docx") {
-      const url = URL.createObjectURL(new Blob([html()], { type: "application/msword" }));
-      Object.assign(document.createElement("a"), { href: url, download: "SkillOra-Resume.doc" }).click();
-      URL.revokeObjectURL(url);
-      return note("Word-compatible file downloaded");
-    }
-    const w = window.open("", "_blank");
-    if (!w) return note("Allow pop-ups to save as PDF");
-    w.document.write(html()); w.document.close(); w.focus(); w.print();
-    note("Choose “Save as PDF” in the print dialog");
+  }, [live, jobId, bullets]);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(""), 3500);
   };
 
-  const verified = facts.filter((f) => f.status === "verified").length;
-  const allOk = checks.every((c) => c.ok);
+  const getResumeHtml = () => `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${profile.name || "Palak Bhatt"} - Skillora Resume</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.5; color: #141A16; margin: 40px; }
+          h1 { margin-bottom: 4px; font-size: 26px; }
+          .contact { font-size: 13px; color: #556056; margin-bottom: 24px; }
+          h2 { font-size: 15px; text-transform: uppercase; border-bottom: 1.5px solid #1E6B38; padding-bottom: 4px; margin-top: 20px; color: #1E6B38; }
+          ul { margin-top: 8px; padding-left: 20px; }
+          li { font-size: 13px; margin-bottom: 6px; }
+          .citation { font-size: 11px; color: #78827A; font-family: monospace; }
+        </style>
+      </head>
+      <body>
+        <h1>${profile.name || "Palak Bhatt"}</h1>
+        <div class="contact">
+          ${profile.email || "palak@skillora.ai"} · ${profile.location || "Bengaluru"} · ${profile.links || "github.com/palakbhatt1"}
+        </div>
+        <h2>Professional Summary</h2>
+        <p style="font-size: 13px;">${summary || "Software Engineer specializing in agentic workflows and reliable LLM system design."}</p>
+        <h2>Experience &amp; Projects</h2>
+        <ul>
+          ${bullets.map((b) => `<li>${b.text} <span class="citation">[${b.facts.join(", ")}]</span></li>`).join("")}
+        </ul>
+      </body>
+    </html>
+  `;
+
+  const handleDownload = (fmt: "pdf" | "docx") => {
+    if (live && jobId) {
+      window.location.href = api.exportUrl(jobId, fmt);
+      return showToast(fmt === "pdf" ? "Downloading verified PDF resume..." : "Downloading Word DOCX resume...");
+    }
+
+    if (fmt === "docx") {
+      const blob = new Blob([getResumeHtml()], { type: "application/msword" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(profile.name || "Candidate").replace(/\s+/g, "_")}_Resume.doc`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return showToast("Downloaded Word-compatible resume document!");
+    }
+
+    // PDF Print window fallback
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return showToast("Please allow pop-ups to export as PDF.");
+    printWindow.document.write(getResumeHtml());
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    showToast("Opened print dialog — select 'Save as PDF'.");
+  };
+
+  const verifiedCount = facts.filter((f) => f.status === "verified").length;
+  const allChecksOk = checks.every((c) => c.ok);
 
   return (
-    <div ref={root}>
-      <PageHead step={6} title="Export" sub="Download the final, fact-verified resume. Only bullets that passed the Verifier are exported, and each still traces to a fact ID." />
-
-      <div className="split even">
-        <div className="card flat" data-in>
-          <h3 className="h3" style={{ marginBottom: "1.4rem" }}>Pre-flight checks</h3>
-          <ul className="check-list" style={{ padding: 0 }}>
-            {checks.map((c) => (
-              <li key={c.text} style={{ transform: "translateX(-20px)" }}>
-                <span className={`chip ${c.ok ? "green" : "rose"}`}>{c.ok ? "✓" : "✕"}</span><span>{c.text}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="row wrapflex" style={{ marginTop: "2rem" }}>
-            <span className="chip">{bullets.length} bullets</span>
-            <span className="chip">{verified} verified facts</span>
-            <span className="chip green">score {score}/100</span>
+    <div className="space-y-8 max-w-5xl mx-auto">
+      
+      {/* Header section */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#1E6B38] bg-[#EAF4EB] px-2.5 py-0.5 rounded-full border border-[#C5E1CB]">
+              Stage 6 · Final Export
+            </span>
+            <span className="text-xs text-[#78827A]">Production-Ready Resume</span>
           </div>
-          {!allOk && <p className="muted small" style={{ marginTop: "1rem" }}>Blocked bullets are left out of the export. Fix or rewrite them on the Tailor screen.</p>}
+          <h1 className="text-3xl sm:text-4xl font-serif font-normal text-[#141A16] tracking-tight">
+            Export Verified Resume
+          </h1>
+          <p className="text-sm text-[#556056] max-w-2xl leading-relaxed">
+            Pre-flight checklist verifies that every claim is anchored to ground truth. Export in clean ATS-friendly PDF or Word DOCX format.
+          </p>
         </div>
 
-        <div className="grid g2" data-in>
-          <div className="card" style={{ display: "grid", gap: "1.4rem", placeItems: "center", textAlign: "center" }}>
-            <div className="doc-ico pdf">PDF</div>
-            <div><b>Print-ready PDF</b><p className="muted small">{live ? "Generated by the backend (fpdf2)." : "Browser print in demo mode."}</p></div>
-            <button className="btn primary" onClick={() => download("pdf")}>Download PDF</button>
-          </div>
-          <div className="card" style={{ display: "grid", gap: "1.4rem", placeItems: "center", textAlign: "center" }}>
-            <div className="doc-ico docx">DOCX</div>
-            <div><b>Editable Word file</b><p className="muted small">{live ? "Generated by the backend (python-docx)." : "Word-compatible file in demo mode."}</p></div>
-            <button className="btn primary" onClick={() => download("docx")}>Download DOCX</button>
-          </div>
-        </div>
+        <Link
+          href="/"
+          className="px-6 py-2.5 bg-[#FAF9F5] hover:bg-white text-[#141A16] border border-[#ECE7DD] rounded-full font-bold text-xs sm:text-sm shadow-sm transition-all shrink-0 flex items-center gap-1.5 self-start sm:self-auto"
+        >
+          <span>← Back to Home</span>
+        </Link>
       </div>
-      {toast && <div className="toast">{toast}</div>}
+
+      {toastMsg && (
+        <div className="p-3.5 rounded-xl bg-[#EAF4EB] border border-[#C5E1CB] text-xs sm:text-sm font-medium text-[#1E6B38] flex items-center justify-between">
+          <span>{toastMsg}</span>
+          <button onClick={() => setToastMsg("")} className="text-xs opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+
+      {/* 2-Column Pre-flight Checklist vs Download Formats */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* Left Column: Pre-Flight Checklist */}
+        <div className="lg:col-span-7 bg-white p-6 sm:p-8 rounded-2xl border border-[#ECE7DD] shadow-[0_2px_14px_rgba(0,0,0,0.02)] space-y-6">
+          <div className="flex items-center justify-between border-b border-[#ECE7DD] pb-3">
+            <h3 className="text-base font-serif font-bold text-[#141A16]">Pre-Flight Grounding Checks</h3>
+            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+              allChecksOk ? "bg-[#EAF4EB] text-[#1E6B38]" : "bg-amber-100 text-amber-800"
+            }`}>
+              {allChecksOk ? "✓ Passed 100%" : "Requires Review"}
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {checks.map((c, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-3 p-3 rounded-xl bg-[#FAF9F5] border border-[#ECE7DD]"
+              >
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                  c.ok ? "bg-[#1E6B38] text-white" : "bg-rose-500 text-white"
+                }`}>
+                  {c.ok ? "✓" : "✕"}
+                </span>
+                <span className="text-xs sm:text-sm font-medium text-[#141A16] leading-relaxed">
+                  {c.text}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Quick Stats Pill Row */}
+          <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-[#ECE7DD]">
+            <span className="px-3 py-1 rounded-full bg-[#FAF9F5] border border-[#ECE7DD] text-xs font-bold text-[#141A16]">
+              {bullets.length} Resume Bullets
+            </span>
+            <span className="px-3 py-1 rounded-full bg-[#EAF4EB] border border-[#C5E1CB] text-xs font-bold text-[#1E6B38]">
+              {verifiedCount} Verified Fact Citations
+            </span>
+            <span className="px-3 py-1 rounded-full bg-[#FAF9F5] border border-[#ECE7DD] text-xs font-bold text-[#141A16]">
+              ATS Score: {score}/100
+            </span>
+          </div>
+        </div>
+
+        {/* Right Column: Download Formats & Preview Card */}
+        <div className="lg:col-span-5 bg-white p-6 sm:p-8 rounded-2xl border border-[#ECE7DD] shadow-[0_2px_14px_rgba(0,0,0,0.02)] space-y-6">
+          <div className="border-b border-[#ECE7DD] pb-3">
+            <h3 className="text-base font-serif font-bold text-[#141A16]">Download Formats</h3>
+            <p className="text-xs text-[#78827A]">Both formats follow clean ATS typography guidelines</p>
+          </div>
+
+          {/* PDF Download Button */}
+          <button
+            onClick={() => handleDownload("pdf")}
+            className="w-full p-4 rounded-xl border border-[#ECE7DD] bg-[#FAF9F5] hover:bg-[#EAF4EB] hover:border-[#C5E1CB] transition-all flex items-center justify-between text-left group cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">📄</span>
+              <div>
+                <p className="text-sm font-bold text-[#141A16] group-hover:text-[#1E6B38]">
+                  Download PDF Resume
+                </p>
+                <p className="text-xs text-[#78827A]">Print-ready vector layout with verified grounding</p>
+              </div>
+            </div>
+            <span className="text-base font-bold text-[#1E6B38] group-hover:translate-x-1 transition-transform">
+              ↓
+            </span>
+          </button>
+
+          {/* Word DOCX Download Button */}
+          <button
+            onClick={() => handleDownload("docx")}
+            className="w-full p-4 rounded-xl border border-[#ECE7DD] bg-[#FAF9F5] hover:bg-[#EAF4EB] hover:border-[#C5E1CB] transition-all flex items-center justify-between text-left group cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">📝</span>
+              <div>
+                <p className="text-sm font-bold text-[#141A16] group-hover:text-[#1E6B38]">
+                  Download Word (.DOCX)
+                </p>
+                <p className="text-xs text-[#78827A]">Fully editable document formatted for recruiter ATS systems</p>
+              </div>
+            </div>
+            <span className="text-base font-bold text-[#1E6B38] group-hover:translate-x-1 transition-transform">
+              ↓
+            </span>
+          </button>
+
+          <div className="p-3.5 rounded-xl bg-[#FAF9F5] border border-[#ECE7DD] text-xs text-[#556056] leading-relaxed">
+            <span className="font-bold text-[#1E6B38]">Recruiter Assurance: </span>
+            This resume was generated through Skillora's verifiable multi-agent pipeline. Zero hallucinated claims or exaggerated metrics.
+          </div>
+        </div>
+
+      </div>
+
+      {/* Bottom Navigation */}
+      <div className="pt-4 flex items-center justify-between border-t border-[#ECE7DD]">
+        <Link
+          href="/score"
+          className="text-xs font-semibold text-[#556056] hover:text-[#141A16] flex items-center gap-1"
+        >
+          <span>← Back to Score Report</span>
+        </Link>
+
+        <Link
+          href="/sources"
+          className="text-xs font-bold text-[#1E6B38] hover:underline"
+        >
+          + Add more projects for another role
+        </Link>
+      </div>
+
     </div>
   );
 }

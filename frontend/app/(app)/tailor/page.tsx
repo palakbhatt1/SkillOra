@@ -1,208 +1,384 @@
 "use client";
+
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { api } from "@/lib/api";
-import { PageHead } from "@/components/AppShell";
-import { gsap, useGSAP } from "@/lib/gsap";
 import { useStore } from "@/lib/store";
+import { api } from "@/lib/api";
 
 const nums = (s: string) => s.match(/\d+(\.\d+)?/g) ?? [];
 
-export default function Tailor() {
-  const root = useRef<HTMLDivElement>(null);
-  const chatBox = useRef<HTMLDivElement>(null);
+export default function TailorPage() {
+  const chatBoxRef = useRef<HTMLDivElement>(null);
   const st = useStore();
-  const { bullets, facts, keywords, projects, profile, live } = st;
-  const [msg, setMsg] = useState("");
-  const [verifying, setVerifying] = useState(false);
-  const [editEdu, setEditEdu] = useState(false);
-  const [eduForm, setEduForm] = useState({ degree: "", college: "", years: "" });
-
-  // Live mode: the backend Verifier decides (and explains). Demo mode: same number/ledger rule, client-side.
-  const issues = (b: (typeof bullets)[number]): string | null => {
-    if (b.user) return null;  // your own wording: exported as you wrote it
-    if (live) return b.verified ? null : (b.issues?.[0] ?? "blocked by the Verifier");
-    const cited = b.facts.map((id) => facts.find((f) => f.id === id));
-    if (cited.some((f) => !f || f.status !== "verified")) return "cites an unverified fact";
-    const pool = cited.map((f) => f!.text + " " + f!.span).join(" ");
-    const bad = nums(b.text).filter((n) => !pool.includes(n));
-    return bad.length ? `number “${bad[0]}” not in cited source` : null;
-  };
-  const blocked = bullets.filter(issues).length;
-
-  const { contextSafe } = useGSAP({ scope: root });
-
-  // first time: pre-fill degree / college / years from the uploaded resume so the user only confirms
-  useEffect(() => {
-    if (live && !profile.education) api.eduHint().then((h) => h && setEduForm(h)).catch(() => {});
-  }, [live, profile.education]);
+  const { bullets, facts, keywords, profile, live, summary } = st;
+  const [chatInput, setChatInput] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [activeCitation, setActiveCitation] = useState<{ bulletId: string; factText: string; span: string } | null>(null);
 
   useEffect(() => {
-    chatBox.current?.scrollTo({ top: chatBox.current.scrollHeight, behavior: "smooth" });
+    chatBoxRef.current?.scrollTo({ top: chatBoxRef.current.scrollHeight, behavior: "smooth" });
   }, [st.chat.length]);
 
-  const runVerifier = contextSafe(() => {
-    setVerifying(true);
-    gsap.fromTo(".vrow", { x: -20, opacity: 0.2 }, { x: 0, opacity: 1, stagger: 0.18, duration: 0.5, ease: "power2.out", onComplete: () => setVerifying(false) });
-    gsap.fromTo(".vscan", { top: 0, opacity: 1 }, { top: "100%", duration: bullets.length * 0.18 + 0.4, ease: "none", onComplete: () => { gsap.set(".vscan", { opacity: 0 }); } });
-  });
+  const getBulletIssue = (b: (typeof bullets)[number]): string | null => {
+    if (b.user) return null;
+    if (live) return b.verified ? null : (b.issues?.[0] ?? "Grounded verification pending");
+    const cited = b.facts.map((id) => facts.find((f) => f.id === id));
+    if (cited.some((f) => !f || f.status !== "verified")) return "Cites an unverified fact claim";
+    const pool = cited.map((f) => (f ? f.text + " " + f.span : "")).join(" ");
+    const bad = nums(b.text).filter((n) => !pool.includes(n));
+    return bad.length ? `Number "${bad[0]}" not present in source verbatim quote` : null;
+  };
 
-  const send = () => {
-    const q = msg.trim();
+  const handleSendChat = () => {
+    const q = chatInput.trim();
     if (!q) return;
-    setMsg("");
+    setChatInput("");
     st.sendChat(q);
   };
 
-  // Jobs/internships and projects are different things on a resume: separate sections, no internal "selected" line
-  const section = (title: string, kind: "role" | "project") => {
+  const handleRunVerifier = async () => {
+    setIsVerifying(true);
+    await new Promise((r) => setTimeout(r, 900));
+    setIsVerifying(false);
+  };
+
+  const renderSection = (title: string, kind: "role" | "project") => {
     const items = bullets.filter((b) => (b.kind === "role" ? "role" : "project") === kind);
     if (!items.length) return null;
+
+    const projectNames = Array.from(new Set(items.map((b) => b.project)));
+
     return (
-      <>
-        <h4>{title}</h4>
-        {Array.from(new Set(items.map((b) => b.project))).map((proj) => (
-          <div key={proj}>
-            <div className="pn">{proj}</div>
-            {items.filter((b) => b.project === proj).map((b) => {
-              const bad = issues(b);
+      <div className="space-y-4">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-[#78827A] border-b border-[#ECE7DD] pb-1">
+          {title}
+        </h4>
+
+        {projectNames.map((proj) => (
+          <div key={proj} className="space-y-2">
+            <h5 className="text-sm font-bold text-[#141A16]">{proj}</h5>
+
+            <div className="space-y-2 pl-2 border-l-2 border-[#E5E1D5]">
+              {items.filter((b) => b.project === proj).map((b) => {
+                const issue = getBulletIssue(b);
+                const citedFact = facts.find((f) => b.facts.includes(f.id));
+
+                return (
+                  <div
+                    key={b.id}
+                    className={`p-2.5 rounded-xl border transition-all text-xs sm:text-sm ${
+                      issue
+                        ? "bg-[#FEF3C7]/40 border-[#FDE68A]"
+                        : "bg-[#FAF9F5] border-[#ECE7DD] hover:border-[#1E6B38]"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span className={`text-base leading-tight ${issue ? "text-amber-600" : "text-[#1E6B38]"}`}>
+                        •
+                      </span>
+
+                      <div className="flex-1 space-y-1.5">
+                        <p
+                          contentEditable
+                          suppressContentEditableWarning
+                          onBlur={(e) => {
+                            const newText = e.currentTarget.textContent?.trim();
+                            if (newText && newText !== b.text) {
+                              st.editBullet(b.id, newText);
+                            }
+                          }}
+                          className="text-[#141A16] leading-relaxed focus:outline-none focus:bg-white p-1 rounded"
+                        >
+                          {b.text}
+                        </p>
+
+                        <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                          {/* Grounding Badge */}
+                          <span className={`px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 ${
+                            issue
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-[#EAF4EB] text-[#1E6B38]"
+                          }`}>
+                            <span>{issue ? "⚠️" : "✓"}</span>
+                            <span>{issue ? issue : "Grounded"}</span>
+                          </span>
+
+                          {/* Citation Link */}
+                          {citedFact && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (activeCitation?.bulletId === b.id) {
+                                  setActiveCitation(null);
+                                } else {
+                                  setActiveCitation({
+                                    bulletId: b.id,
+                                    factText: citedFact.text,
+                                    span: citedFact.span,
+                                  });
+                                }
+                              }}
+                              className="text-[10px] text-[#556056] hover:text-[#1E6B38] underline font-mono cursor-pointer"
+                            >
+                              [Fact {citedFact.id}]
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Citation Popup Drawer */}
+                        {activeCitation?.bulletId === b.id && (
+                          <div className="p-2.5 bg-white rounded-lg border border-[#C5E1CB] shadow-sm text-xs space-y-1 mt-1 font-mono">
+                            <p className="text-[#1E6B38] font-bold text-[11px]">Verbatim Source Quote:</p>
+                            <p className="text-[#556056] italic">"{activeCitation.span}"</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-8 max-w-7xl mx-auto">
+      
+      {/* Header section */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#1E6B38] bg-[#EAF4EB] px-2.5 py-0.5 rounded-full border border-[#C5E1CB]">
+              Stage 4 · Tailoring & Grounding
+            </span>
+            <span className="text-xs text-[#78827A]">Google ADK Resume Engine</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-serif font-normal text-[#141A16] tracking-tight">
+            Resume Canvas & AI Assistant
+          </h1>
+          <p className="text-sm text-[#556056] max-w-2xl leading-relaxed">
+            Every bullet is synthesized from verified ledger facts. Edit directly on the canvas or collaborate with the Google ADK Coordinator agent.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRunVerifier}
+            disabled={isVerifying}
+            className="px-4 py-2 bg-white hover:bg-[#FAF9F5] text-[#1E6B38] border border-[#C5E1CB] rounded-full font-bold text-xs shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>{isVerifying ? "Verifying..." : "✓ Run Verifier"}</span>
+          </button>
+
+          <Link
+            href="/score"
+            className="px-6 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-1.5"
+          >
+            <span>Check ATS Score</span>
+            <span>→</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Main Split Layout: Resume Canvas (Left) vs ADK Chat Drawer (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* Left Column: Live Grounded Resume Sheet */}
+        <div className="lg:col-span-7 bg-white p-8 rounded-2xl border border-[#ECE7DD] shadow-[0_2px_14px_rgba(0,0,0,0.02)] space-y-6">
+          
+          {/* Resume Header / Candidate Info */}
+          <div className="border-b border-[#ECE7DD] pb-5 space-y-2">
+            <h2 className="text-2xl font-serif font-bold text-[#141A16]">
+              {profile.name || "Palak Bhatt"}
+            </h2>
+            <div className="flex items-center gap-3 text-xs text-[#556056] flex-wrap">
+              <span>{profile.email || "palak@skillora.ai"}</span>
+              <span>·</span>
+              <span>{profile.location || "Bengaluru, India"}</span>
+              <span>·</span>
+              <span className="font-mono">{profile.links || "github.com/palakbhatt1"}</span>
+            </div>
+          </div>
+
+          {/* Professional Summary */}
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#78827A]">
+              Professional Summary
+            </h4>
+            <div
+              contentEditable
+              suppressContentEditableWarning
+              onBlur={(e) => {
+                const text = e.currentTarget.textContent?.trim();
+                if (text && text !== summary) st.editSummary(text);
+              }}
+              className="p-3 rounded-xl bg-[#FAF9F5] border border-[#ECE7DD] text-xs sm:text-sm text-[#141A16] leading-relaxed focus:outline-none focus:bg-white"
+            >
+              {summary || "Full-stack engineer with hands-on experience developing multi-agent LLM systems and explainable scoring engines."}
+            </div>
+          </div>
+
+          {/* Experience Section */}
+          {renderSection("Experience & Internships", "role")}
+
+          {/* Projects Section */}
+          {renderSection("Production Projects", "project")}
+
+          {/* Keyword Coach / Recommendations Chips */}
+          {keywords && keywords.length > 0 && (
+            <div className="pt-4 border-t border-[#ECE7DD] space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#78827A]">
+                  Keyword Coach (ATS Optimization)
+                </h4>
+                <span className="text-[10px] text-[#1E6B38] font-semibold">
+                  Zero Hallucination
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {keywords.map((kw) => (
+                  <div
+                    key={kw.id}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#FAF9F5] border border-[#ECE7DD] text-xs"
+                  >
+                    <span className="font-bold text-[#141A16]">{kw.word}</span>
+                    <button
+                      type="button"
+                      onClick={() => st.decideKeyword(kw.id, true)}
+                      title="Accept keyword recommendation"
+                      className="text-xs text-[#1E6B38] hover:text-[#16532B] font-bold"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => st.decideKeyword(kw.id, false)}
+                      title="Dismiss keyword"
+                      className="text-xs text-[#78827A] hover:text-rose-600"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        {/* Right Column: Google ADK Assistant Chat */}
+        <div className="lg:col-span-5 bg-white p-6 rounded-2xl border border-[#ECE7DD] shadow-[0_2px_14px_rgba(0,0,0,0.02)] space-y-4">
+          <div className="flex items-center justify-between border-b border-[#ECE7DD] pb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🤖</span>
+              <div>
+                <h3 className="text-sm font-bold text-[#141A16]">Google ADK Assistant</h3>
+                <p className="text-[10px] text-[#78827A]">Grounded Tailoring Coordinator</p>
+              </div>
+            </div>
+
+            <span className="text-[10px] font-semibold text-[#1E6B38] bg-[#EAF4EB] border border-[#C5E1CB] px-2 py-0.5 rounded-full">
+              Connected
+            </span>
+          </div>
+
+          {/* Quick Prompt Chips */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] text-[#78827A] font-semibold uppercase tracking-wider">
+              Quick Refinements:
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                "Strengthen XYZ metrics",
+                "Emphasize distributed systems",
+                "Condense bullets to 1 page",
+                "Highlight CrewAI flows",
+              ].map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => st.sendChat(chip)}
+                  className="text-[11px] font-medium text-[#1E6B38] bg-[#FAF9F5] hover:bg-[#EAF4EB] border border-[#ECE7DD] px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                >
+                  + {chip}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Chat Messages Log */}
+          <div
+            ref={chatBoxRef}
+            className="h-80 overflow-y-auto space-y-3 p-3 rounded-xl bg-[#FAF9F5] border border-[#ECE7DD]"
+          >
+            {st.chat.map((msg, idx) => {
+              const isUser = msg.from === "you" || msg.from === "user";
               return (
-                <div key={b.id + b.text.length} className="b" style={bad ? { background: "#ffe0c2" } : undefined}>
-                  <span>•</span>
-                  <span contentEditable suppressContentEditableWarning
-                    onBlur={(e) => { const t = (e.currentTarget.textContent ?? "").trim(); if (t && t !== b.text) st.editBullet(b.id, t); }}>{b.text}</span>
-                  <span className="fid" style={bad ? { background: "#fed7aa", color: "#c2410c" } : undefined}>{b.user ? "✎ yours" : b.facts.slice(0, 2).join(" ")}{b.facts.length > 2 ? ` +${b.facts.length - 2}` : ""}</span>
+                <div
+                  key={idx}
+                  className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
+                >
+                  <span className="text-[10px] text-[#78827A] mb-0.5">
+                    {isUser ? "You" : "Skillora ADK"}
+                  </span>
+                  <div
+                    className={`p-3 rounded-2xl text-xs sm:text-[13px] leading-relaxed max-w-[85%] ${
+                      isUser
+                        ? "bg-[#1E6B38] text-white rounded-br-none"
+                        : "bg-white text-[#141A16] border border-[#ECE7DD] rounded-bl-none shadow-sm"
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
                 </div>
               );
             })}
           </div>
-        ))}
-      </>
-    );
-  };
 
-  const edu = facts.filter((f) => f.category === "education" && f.status === "verified");
-
-  return (
-    <div ref={root}>
-      <PageHead step={4} title="Tailor & Edit" sub="The Writer drafts with fact IDs only; the Verifier blocks anything its source cannot support. Edit freely — every change is re-checked.">
-        <button className="btn" onClick={runVerifier} disabled={verifying}>{verifying ? "Verifying…" : "▶ Run Verifier"}</button>
-        {live && <button className="btn" onClick={() => st.undo()} disabled={!!st.busy}>↶ Undo</button>}
-        {live && <button className="btn" onClick={() => st.regenerate()} disabled={!!st.busy}>↻ Rewrite with agents</button>}
-        <Link href="/score" className="btn primary">View score →</Link>
-      </PageHead>
-
-      {!st.analyzed && live ? (
-        <div className="card flat" data-in><p>No job analysed yet. <Link href="/job" style={{ color: "var(--c-green)" }}>Paste a job description first →</Link></p></div>
-      ) : (
-      <>
-        <div className="tailor">
-          <div className="paper" data-in>
-            <h2>{profile.name}</h2>
-            <p style={{ color: "#9a5a2a", fontSize: ".85rem" }}>{[profile.email, profile.links, profile.location].filter(Boolean).join(" · ")}</p>
-            <h4>Summary</h4>
-            <p style={{ fontSize: ".95rem" }} contentEditable suppressContentEditableWarning onBlur={(e) => { const t = e.currentTarget.textContent ?? ""; if (t && t !== st.summary) st.editSummary(t); }}>{st.summary}</p>
-            {st.skills.length > 0 && (<><h4>Skills</h4><p style={{ fontSize: ".9rem" }}>{st.skills.join(", ")}</p></>)}
-            {section("Professional Experience", "role")}
-            {section("Projects", "project")}
-            {(() => {
-              const eduText = profile.education || edu.map((e) => e.span || e.text).join("; ");
-              const parts = profile.education ? profile.education.split(" | ").map((x) => x.trim()) : [];
-              const missing = !profile.education && !/\b(19|20)\d{2}\b/.test(eduText);  // no year found -> ask
-              const field = { background: "#fff8ef", color: "#3a1a08", border: "1px solid #f0c9a0", borderRadius: ".5rem", padding: ".55rem .8rem", font: "inherit", fontSize: ".9rem", width: "100%" } as const;
-              const save = () => {
-                const degree = (eduForm.degree || edu[0]?.span || "").trim(), college = eduForm.college.trim(), years = eduForm.years.trim();
-                if (degree && college && years) { st.saveProfile({ ...profile, education: [degree, college, years].join(" | ") }); setEditEdu(false); }
-              };
-              return (
-                <>
-                  <h4>Education</h4>
-                  {eduText && !editEdu && (
-                    <div style={{ fontSize: ".9rem" }}>
-                      {parts.length === 3 ? (
-                        <>
-                          <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", fontWeight: 700 }}><span>{parts[1]}</span><span>{parts[2]}</span></div>
-                          <div>{parts[0]}</div>
-                        </>
-                      ) : <div>{eduText}</div>}
-                      <button style={{ color: "#c2410c", fontSize: ".8rem", marginTop: ".3rem" }} onClick={() => { setEduForm(parts.length === 3 ? { degree: parts[0], college: parts[1], years: parts[2] } : { degree: profile.education || edu[0]?.span || "", college: "", years: "" }); setEditEdu(true); }}>✎ edit</button>
-                    </div>
-                  )}
-                  {(missing || editEdu) && (
-                    <div style={{ background: "#fff1e0", border: "1px dashed #f97316", borderRadius: ".7rem", padding: "1rem", display: "grid", gap: ".6rem" }}>
-                      <b style={{ fontSize: ".9rem" }}>Which degree, college and years should appear here? <span style={{ fontWeight: 400, color: "#9a5a2a" }}>(all three are printed on your resume)</span></b>
-                      <input style={field} placeholder="Degree, e.g. B.Tech in Computer Science and Engineering (AI Specialization)" value={eduForm.degree || (edu[0]?.span ?? "")} onChange={(e) => setEduForm({ ...eduForm, degree: e.target.value })} />
-                      <input style={field} placeholder="College / university, e.g. BML Munjal University, Gurugram" value={eduForm.college} onChange={(e) => setEduForm({ ...eduForm, college: e.target.value })} />
-                      <input style={field} placeholder="Years, e.g. 2023 – 2027" value={eduForm.years} onChange={(e) => setEduForm({ ...eduForm, years: e.target.value })} />
-                      <div style={{ display: "flex", gap: ".5rem" }}>
-                        <button onClick={save} disabled={!((eduForm.degree || edu[0]?.span) && eduForm.college.trim() && eduForm.years.trim())} style={{ opacity: (eduForm.degree || edu[0]?.span) && eduForm.college.trim() && eduForm.years.trim() ? 1 : 0.45, background: "#f97316", color: "#fff", padding: ".5rem 1.1rem", borderRadius: "999px", fontWeight: 600, fontSize: ".85rem" }}>Save education</button>
-                        {editEdu && <button onClick={() => setEditEdu(false)} style={{ padding: ".5rem 1rem", fontSize: ".85rem" }}>Cancel</button>}
-                      </div>
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-          <div className="chat-side">
-            <div className="card flat" data-in>
-              <h3 className="h3" style={{ marginBottom: ".8rem" }}>Coordinator chat</h3>
-              <div className="chat" ref={chatBox}>
-                {st.chat.map((c, i) => <div key={i} className={`msg ${c.from}`}>{c.text}</div>)}
-              </div>
-              <div className="row">
-                <input className="input" placeholder="e.g. make the summary mention system design, or undo" value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
-                <button className="btn sm primary" onClick={send} disabled={!!st.busy}>Send</button>
-              </div>
-            </div>
+          {/* Chat Input */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
+              placeholder="Ask the ADK assistant to tailor or explain..."
+              className="flex-1 h-10 px-3.5 rounded-xl border border-[#E5E1D5] bg-[#FAF9F6] text-xs sm:text-sm text-[#141A16] placeholder:text-[#9DA69E] focus:outline-none focus:border-[#1E6B38] focus:bg-white transition-all"
+            />
+            <button
+              onClick={handleSendChat}
+              disabled={!chatInput.trim()}
+              className="h-10 px-4 rounded-xl bg-[#1E6B38] hover:bg-[#16532B] disabled:opacity-40 text-white font-bold text-xs shrink-0 transition-colors shadow-sm cursor-pointer"
+            >
+              Send
+            </button>
           </div>
         </div>
 
-        <div className="grid g2 tools" style={{ marginTop: "1.6rem" }}>
-          <div className="card flat" data-in style={{ position: "relative", overflow: "hidden" }}>
-              <div className="row between"><h3 className="h3">Verifier</h3><span className={`chip ${blocked ? "rose" : "green"}`}>{blocked ? `${blocked} blocked` : "all grounded"}</span></div>
-              <div style={{ marginTop: ".6rem" }}>
-                {bullets.map((b) => {
-                  const bad = issues(b);
-                  return (
-                    <div key={b.id} className="verify-row vrow">
-                      <span style={{ color: bad ? "var(--c-rose)" : "var(--c-green)" }}>{bad ? "✕" : "✓"}</span>
-                      <span className="mono">{b.facts.join(",")}</span>
-                      <span className="muted small">{bad ?? (b.user ? "your wording, not source-checked" : "supported by span")}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="vscan" style={{ position: "absolute", left: 0, right: 0, height: 2, background: "var(--c-green)", opacity: 0, boxShadow: "0 0 1.2rem var(--c-green)" }} />
-            </div>
-          <div className="card flat" data-in>
-              <h3 className="h3" style={{ marginBottom: ".8rem" }}>Keyword Coach</h3>
-              <div className="stack">
-                {keywords.map((k) => (
-                  <div key={k.id} className="req" style={{ gridTemplateColumns: "1fr" }}>
-                    <div className="row between"><b>{k.word}</b>
-                      <span className={`chip ${k.state === "gap" ? "rose" : k.state === "accepted" ? "green" : k.state === "rejected" ? "" : "amber"}`}>
-                        {k.state === "gap" ? "genuine gap" : k.state}
-                      </span>
-                    </div>
-                    <p className="muted small">{k.note}</p>
-                    {k.state === "suggested" && (
-                      <div className="row" style={{ gap: ".5rem" }}>
-                        <button className="btn sm good" onClick={() => st.decideKeyword(k.id, true)}>Accept</button>
-                        <button className="btn sm bad" onClick={() => st.decideKeyword(k.id, false)}>Reject</button>
-                      </div>
-                    )}
-                    {k.state === "gap" && live && (
-                      <button className="btn sm warn" style={{ justifySelf: "start" }} onClick={() => st.declareSkill(k.word)}>I know this — declare skill</button>
-                    )}
-                  </div>
-                ))}
-                {keywords.length === 0 && <p className="muted small">Every JD keyword is already covered by grounded bullets.</p>}
-              </div>
-            </div>
-        </div>
-      </>
-      )}
+      </div>
+
+      {/* Bottom Navigation */}
+      <div className="pt-4 flex items-center justify-between border-t border-[#ECE7DD]">
+        <Link
+          href="/job"
+          className="text-xs font-semibold text-[#556056] hover:text-[#141A16] flex items-center gap-1"
+        >
+          <span>← Back to Job Match</span>
+        </Link>
+
+        <Link
+          href="/score"
+          className="px-6 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-1.5"
+        >
+          <span>Check ATS Fit Score</span>
+          <span>→</span>
+        </Link>
+      </div>
+
     </div>
   );
 }

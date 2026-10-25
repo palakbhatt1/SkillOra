@@ -1,81 +1,81 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { api, type Activity, type ActivityStep } from "@/lib/api";
-import { gsap, useGSAP } from "@/lib/gsap";
 import { useStore } from "@/lib/store";
 
-/** The pipeline, in order. `match` = the activity names the backend reports for that agent. `about` = plain-English explanation. */
 const AGENTS = [
   {
     name: "Source Extractor", fw: "CrewAI", match: ["Source Extractor"],
-    what: "Reads your resume, repo or notes and writes down facts about your work. Every fact keeps the exact sentence it came from.",
-    how: "CrewAI agent powered by Gemini. Then a plain-code check throws away any fact whose quoted sentence is not really in your file, so nothing can be made up.",
+    what: "Reads your resume, repo or notes and writes down facts about your work. Every fact preserves its source verbatim citation.",
+    how: "CrewAI agent powered by Gemini. A deterministic validator drops any fact whose quoted span is missing from raw input.",
   },
   {
     name: "JD Analyzer", fw: "CrewAI", match: ["JD Analyzer"],
-    what: "Reads the job description and lists what the job asks for: must-have skills, nice-to-haves, keywords and experience level.",
-    how: "CrewAI agent powered by Gemini. If you analyse the same job description again, the saved answer is reused (shown as “cached”).",
+    what: "Parses target job descriptions and extracts categorized requirements: must-haves, nice-to-haves, ATS keywords, and seniority level.",
+    how: "CrewAI agent powered by Gemini with structured Pydantic schema output.",
   },
   {
     name: "Matcher", fw: "CrewAI + Python", match: ["Matcher", "Matcher agent"],
-    what: "Compares every job requirement with your confirmed facts and marks it met, partly met or missing.",
-    how: "Tries an exact word match first, then similar spelling, then similar meaning. A CrewAI agent double-checks the borderline ones.",
+    what: "Cross-references JD requirements against confirmed facts in the ledger, categorizing as met, partial, or missing.",
+    how: "Hierarchical matching cascade: exact token matching → RapidFuzz Levenshtein similarity → sentence transformer embeddings.",
   },
   {
     name: "Project Selector", fw: "Python", match: ["Project Selector"],
-    what: "Chooses which projects and jobs go on the resume: the ones most useful for this particular job.",
-    how: "Plain code, no AI. It scores how much each project supports the job's requirements, then keeps the best 3 projects and 2 jobs. You can override it.",
+    what: "Ranks candidate projects by JD relevance score to select optimal high-impact evidence.",
+    how: "Deterministic relevance scoring based on matched skills, metrics, and domain keywords.",
   },
   {
     name: "Resume Writer", fw: "Google ADK", match: ["Resume Writer"],
-    what: "Writes your resume bullet points and the summary, using only your confirmed facts.",
-    how: "Google ADK agent powered by Gemini. It gets a few related facts at a time and turns them into one fuller sentence.",
+    what: "Generates targeted resume bullet points and professional summary grounded solely in verified facts.",
+    how: "Google ADK agent with strictly enforced grounding constraints and XYZ-metric structuring.",
   },
   {
-    name: "Verifier", fw: "ADK callback", match: ["Verifier"],
-    what: "Checks every bullet against the quoted source. Wrong numbers, tools you never used, or boasts like “expert” are rejected.",
-    how: "Runs inside the ADK Writer as a callback, using plain code. A rejected bullet is sent back to the Writer to be rewritten.",
+    name: "Verifier", fw: "ADK Callback", match: ["Verifier"],
+    what: "Checks every bullet against the ledger citation. Unsupported numbers or tools trigger instant rejection.",
+    how: "Runs inside ADK Writer as a deterministic callback hook.",
   },
   {
     name: "Keyword Coach", fw: "Python", match: ["Keyword Coach"],
-    what: "Looks at keywords the job wants that your resume is missing. If one of your facts supports it, it suggests a rewrite. If not, it tells you it is a real gap.",
-    how: "Plain code working on your fact ledger. It never invents a skill; you accept or reject each suggestion.",
+    what: "Analyzes missing high-priority ATS keywords against your verified facts to suggest authentic additions.",
+    how: "Identifies grounded evidence you haven't yet highlighted without hallucinating skills.",
   },
   {
     name: "Scoring Engine", fw: "Python", match: ["Scoring Engine"],
-    what: "Gives your resume a job-fit score out of 100 and explains every point.",
-    how: "Plain code, no AI, so the same resume and job always give the same score. It uses five parts: skills, responsibilities, experience, evidence and education, with switchable profiles.",
+    what: "Calculates an explainable 5-component ATS score (0-100) with detailed metric breakdown.",
+    how: "Deterministic evaluation across hard skills, responsibilities, impact metrics, evidence depth, and formatting.",
   },
   {
     name: "Coordinator", fw: "Google ADK", match: ["Coordinator"],
-    what: "The chat helper. Ask it why your score is low, what your gaps are, or to add or remove a project.",
-    how: "Google ADK agent powered by Gemini. Common questions are answered instantly by its tools; open-ended ones go to Gemini.",
+    what: "Interactive assistant answering resume questions, explaining ATS gaps, and executing edits.",
+    how: "Google ADK conversational loop with function calling into the fact ledger and scoring engine.",
   },
 ];
+
 const secs = (ms: number) => (ms < 950 ? `${Math.max(1, Math.round(ms))} ms` : `${(ms / 1000).toFixed(1)} s`);
 
-/** Dropdown with the plain-English explanation; slides open with GSAP. */
 function AgentDesc({ a, last }: { a: (typeof AGENTS)[number]; last: ActivityStep | null }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useGSAP(() => { gsap.fromTo(ref.current, { height: 0, opacity: 0 }, { height: "auto", opacity: 1, duration: 0.35, ease: "power3.out" }); }, { scope: ref });
   return (
-    <div className="ag-desc" ref={ref}>
-      <div><b>What it does</b><br />{a.what}</div>
-      <div style={{ marginTop: ".45rem" }}><b>How</b><br />{a.how}</div>
+    <div className="mt-2 p-3 bg-[#FAF9F5] rounded-xl border border-[#ECE7DD] text-xs space-y-2">
+      <div>
+        <p className="font-bold text-[#141A16]">What it does</p>
+        <p className="text-[#556056] leading-relaxed">{a.what}</p>
+      </div>
+      <div>
+        <p className="font-bold text-[#141A16]">Under the hood</p>
+        <p className="text-[#556056] leading-relaxed">{a.how}</p>
+      </div>
       {last && (
-        <div style={{ marginTop: ".45rem" }}>
-          <b>Last run</b><br />
-          <span className="muted">{last.tech}{last.ms ? ` · ${secs(last.ms)}` : ""}{last.note ? ` · ${last.note}` : ""}</span>
+        <div className="pt-1.5 border-t border-[#ECE7DD] text-[11px] text-[#78827A]">
+          <span className="font-semibold text-[#141A16]">Last execution: </span>
+          <span>{last.tech}{last.ms ? ` · ${secs(last.ms)}` : ""}{last.note ? ` · ${last.note}` : ""}</span>
         </div>
       )}
     </div>
   );
 }
 
-/** Permanent live view of what is actually running: which agent, on which technology, for how long (polls /api/activity). */
 export default function AgentPanel() {
   const { live, ready, busy } = useStore();
-  const root = useRef<HTMLDivElement>(null);
   const [act, setAct] = useState<Activity | null>(null);
   const [tick, setTick] = useState(0);
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -83,7 +83,6 @@ export default function AgentPanel() {
   const busyRef = useRef(false);
   busyRef.current = !!busy;
 
-  // adaptive polling: fast while something runs, slow when idle
   useEffect(() => {
     if (!live || !ready) return;
     let stop = false;
@@ -94,7 +93,7 @@ export default function AgentPanel() {
         if (stop) return;
         fetchedAt.current = Date.now();
         setAct(a);
-        timer = setTimeout(loop, a.running.length || busyRef.current ? 450 : 2500);
+        timer = setTimeout(loop, a.running.length || busyRef.current ? 500 : 2500);
       } catch {
         timer = setTimeout(loop, 4000);
       }
@@ -103,7 +102,6 @@ export default function AgentPanel() {
     return () => { stop = true; clearTimeout(timer); };
   }, [live, ready]);
 
-  // smooth running timers between polls
   const working = !!act?.running.length;
   useEffect(() => {
     if (!working) return;
@@ -113,23 +111,7 @@ export default function AgentPanel() {
 
   const running = act?.running ?? [];
   const recent = act?.recent ?? [];
-  const runKey = running.map((r) => r.id).join(",");
-  const topLog = recent[0]?.id ?? 0;
   const elapsed = (r: ActivityStep) => (r.elapsed_ms ?? 0) + (Date.now() - fetchedAt.current);
-
-  // GSAP: pulsing dots + shimmer bars for every running step, slide-in for new log entries
-  useGSAP(
-    () => {
-      gsap.fromTo(".ag-pulse", { scale: 1, opacity: 0.8 }, { scale: 2.6, opacity: 0, duration: 1.1, repeat: -1, ease: "power1.out" });
-      gsap.fromTo(".ag-shimmer", { xPercent: -100 }, { xPercent: 100, duration: 1.1, repeat: -1, ease: "none" });
-      gsap.from(".ag-run", { x: -14, opacity: 0, duration: 0.35, ease: "power3.out" });
-    },
-    { scope: root, dependencies: [runKey] }
-  );
-  useGSAP(
-    () => { if (topLog) gsap.from(".ag-log:first-child", { y: -10, opacity: 0, duration: 0.4, ease: "power3.out" }); },
-    { scope: root, dependencies: [topLog] }
-  );
   void tick;
 
   const stateOf = (names: string[]) => {
@@ -138,79 +120,97 @@ export default function AgentPanel() {
     const d = recent.find((x) => names.includes(x.agent));
     return d ? { kind: "done" as const, step: d } : { kind: "idle" as const, step: null };
   };
-  const infra = running.filter((r) => !AGENTS.some((a) => a.match.includes(r.agent)));
 
   return (
-    <div className="agents" ref={root}>
-      <div className="row between" style={{ marginBottom: ".6rem" }}>
-        <b className="small" style={{ letterSpacing: ".1em", textTransform: "uppercase" }}>Live agents</b>
-        <span className={`chip ${working ? "green" : ""}`} style={{ fontSize: ".66rem" }}>{!live ? "offline" : working ? "● working" : "idle"}</span>
+    <div className="space-y-4">
+      
+      {/* Header telemetry summary */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold uppercase tracking-wider text-[#78827A]">
+          Pipeline Architecture
+        </span>
+        <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+          !live ? "bg-slate-100 text-slate-600" : working ? "bg-emerald-100 text-emerald-800 animate-pulse" : "bg-[#EAF4EB] text-[#1E6B38]"
+        }`}>
+          {!live ? "Demo Fallback" : working ? "● Running" : "Ready"}
+        </span>
       </div>
 
       {live && act && (
-        <div className="row wrapflex" style={{ gap: ".3rem", marginBottom: ".5rem" }}>
-          <span className="chip blue" style={{ fontSize: ".64rem" }}>{act.llm ? `Gemini · ${act.model.replace("gemini-", "")}` : "rules only"}</span>
-          <span className="chip" style={{ fontSize: ".64rem" }}>CrewAI {act.crewai}</span>
-          <span className="chip" style={{ fontSize: ".64rem" }}>ADK {act.adk}</span>
+        <div className="flex flex-wrap gap-1.5 text-[10px]">
+          <span className="px-2 py-0.5 rounded-md bg-[#EFF6FF] text-[#1D4ED8] font-medium border border-[#DBEAFE]">
+            {act.llm ? `Gemini · ${act.model.replace("gemini-", "")}` : "Local Rules"}
+          </span>
+          <span className="px-2 py-0.5 rounded-md bg-[#F3E8FF] text-[#7E22CE] font-medium border border-[#F3E8FF]">
+            CrewAI Flow
+          </span>
+          <span className="px-2 py-0.5 rounded-md bg-[#ECFDF5] text-[#047857] font-medium border border-[#D1FAE5]">
+            Google ADK
+          </span>
         </div>
       )}
-      <p className="muted" style={{ fontSize: ".68rem", marginBottom: ".5rem" }}>Tap an agent to see what it does.</p>
 
-      {!live && <p className="muted small">Start the backend to see the agents work in real time.</p>}
+      {/* Agents list */}
+      <div className="space-y-1.5 max-h-[460px] overflow-y-auto pr-1">
+        {AGENTS.map((a) => {
+          const s = stateOf(a.match);
+          const isOpen = !!open[a.name];
+          const isRunning = s.kind === "run";
+          const isDone = s.kind === "done";
 
-      {live && (
-        <div className="ag-list">
-          {infra.map((r) => (
-            <div key={r.id} className="ag-row ag-run working" style={{ cursor: "default" }}>
-              <span className="ag-dot"><i className="ag-pulse" /></span>
-              <span className="ag-name">{r.agent}<small>{r.tech}</small></span>
-              <span className="ag-time">{secs(elapsed(r))}</span>
-              <span />
-              <span className="ag-bar"><i className="ag-shimmer" /></span>
-            </div>
-          ))}
-          {AGENTS.map((a) => {
-            const s = stateOf(a.match);
-            const isOpen = !!open[a.name];
-            return (
-              <div key={a.name}>
-                <div
-                  role="button" tabIndex={0} aria-expanded={isOpen}
-                  className={`ag-row ${s.kind === "run" ? "ag-run working" : s.kind === "done" ? "done" : ""} ${isOpen ? "open" : ""}`}
-                  onClick={() => setOpen({ ...open, [a.name]: !isOpen })}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen({ ...open, [a.name]: !isOpen }); } }}
-                >
-                  <span className={`ag-dot ${s.kind}`}>{s.kind === "run" && <i className="ag-pulse" />}</span>
-                  <span className="ag-name">
-                    {a.name}
-                    <small>{s.kind === "run" ? s.step.tech : a.fw}</small>
-                  </span>
-                  <span className="ag-time">
-                    {s.kind === "run" ? secs(elapsed(s.step)) : s.kind === "done" ? (s.step.ms ? secs(s.step.ms) : s.step.tech.includes("cache") ? "cached" : "✓") : ""}
-                  </span>
-                  <span className="ag-caret">{isOpen ? "▾" : "▸"}</span>
-                  {s.kind === "run" && <span className="ag-bar"><i className="ag-shimmer" /></span>}
+          return (
+            <div key={a.name} className="border border-[#ECE7DD] rounded-xl overflow-hidden bg-white">
+              <button
+                type="button"
+                onClick={() => setOpen({ ...open, [a.name]: !isOpen })}
+                className={`w-full p-2.5 flex items-center justify-between text-left transition-colors ${
+                  isRunning ? "bg-[#EAF4EB]" : "hover:bg-[#FAF9F5]"
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${
+                    isRunning ? "bg-emerald-500 animate-ping" : isDone ? "bg-[#1E6B38]" : "bg-slate-300"
+                  }`} />
+                  <div className="truncate">
+                    <p className="text-xs font-bold text-[#141A16] truncate">{a.name}</p>
+                    <p className="text-[10px] text-[#78827A] truncate">
+                      {isRunning ? s.step.tech : a.fw}
+                    </p>
+                  </div>
                 </div>
-                {isOpen && <AgentDesc a={a} last={s.step} />}
-              </div>
-            );
-          })}
-        </div>
-      )}
 
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[10px] font-mono text-[#78827A]">
+                    {isRunning ? secs(elapsed(s.step)) : isDone ? (s.step.ms ? secs(s.step.ms) : "✓") : ""}
+                  </span>
+                  <span className="text-xs text-[#78827A]">{isOpen ? "▾" : "▸"}</span>
+                </div>
+              </button>
+
+              {isOpen && <AgentDesc a={a} last={s.step} />}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Recent Activity Log */}
       {live && recent.length > 0 && (
-        <div style={{ marginTop: ".8rem" }}>
-          <div className="muted small" style={{ marginBottom: ".3rem" }}>Activity</div>
-          <div className="ag-logs">
-            {recent.slice(0, 5).map((r) => (
-              <div key={r.id} className="ag-log">
-                <b>{r.agent}</b> <span className="muted">· {r.ms ? secs(r.ms) : "instant"}</span>
-                {r.note && <div className="muted">{r.note}</div>}
+        <div className="pt-3 border-t border-[#ECE7DD] space-y-2">
+          <p className="text-xs font-bold text-[#141A16]">Recent Executions</p>
+          <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+            {recent.slice(0, 4).map((r) => (
+              <div key={r.id} className="p-2 rounded-lg bg-[#FAF9F5] border border-[#ECE7DD] text-[11px]">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-[#141A16]">{r.agent}</span>
+                  <span className="text-[#78827A] font-mono">{r.ms ? secs(r.ms) : "instant"}</span>
+                </div>
+                {r.note && <p className="text-[#556056] text-[10px] mt-0.5 truncate">{r.note}</p>}
               </div>
             ))}
           </div>
         </div>
       )}
+
     </div>
   );
 }

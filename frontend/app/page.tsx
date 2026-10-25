@@ -1,366 +1,396 @@
 "use client";
+
+import Image from "next/image";
 import Link from "next/link";
-import { useRef } from "react";
-import { gsap, useGSAP } from "@/lib/gsap";
-import { agents, evalMetrics, scoreComponents, team, timeline } from "@/lib/data";
 
-const steps = [
-  { phase: "Phase 1 · Source of truth", t: "Add sources", d: "GitHub repos, PDFs, DOCX, PPTX and notes — input-checked for malicious content, PII and file size.", tag: "Ingest" },
-  { phase: "Phase 1 · Source of truth", t: "Extract facts", d: "The Source Extractor (CrewAI) turns chunks into facts, each with a quoted source span.", tag: "CrewAI" },
-  { phase: "Phase 1 · Source of truth", t: "Verify in the ledger", d: "You confirm, edit or reject every fact. Changed sources flag affected facts as stale.", tag: "Human-in-loop" },
-  { phase: "Phase 2 · Per job", t: "Analyze the JD", d: "Pasted job description becomes structured must / nice-have requirements and keywords.", tag: "CrewAI" },
-  { phase: "Phase 2 · Per job", t: "Match & select", d: "Exact → fuzzy → embedding matching, then projects chosen by task relevance.", tag: "CrewAI + ADK" },
-  { phase: "Phase 2 · Per job", t: "Write & verify", d: "The Writer uses fact IDs only. The Verifier blocks any unsupported claim.", tag: "Google ADK" },
-  { phase: "Phase 2 · Per job", t: "Score & export", d: "A deterministic five-component score with evidence, then PDF or DOCX.", tag: "Python" },
-];
-
-const marquee = ["Fact ledger", "Zero fabrication", "Explainable score", "CrewAI Flows", "Google ADK", "Gemini", "FastAPI", "Next.js", "Local-first"];
-
-export default function Landing() {
-  const root = useRef<HTMLDivElement>(null);
-
-  useGSAP(
-    () => {
-      const mm = gsap.matchMedia();
-
-      // ---- hero intro ----
-      const tl = gsap.timeline({ defaults: { ease: "power4.out" } });
-      tl.from(".nav", { y: -80, opacity: 0, duration: 0.9 })
-        .from(".hero .eyebrow", { y: 20, opacity: 0, duration: 0.7 }, 0.2)
-        .from(".hero h1 .line > span", { yPercent: 110, rotate: 3, duration: 1.1, stagger: 0.12 }, 0.3)
-        .from(".hero .lead", { y: 30, opacity: 0, duration: 0.9 }, 0.8)
-        .from(".hero-actions .btn", { y: 30, opacity: 0, stagger: 0.1, duration: 0.8 }, 0.95)
-        .from(".hero-stats > div", { y: 30, opacity: 0, stagger: 0.1, duration: 0.8 }, 1.05)
-        .from(".float-card", { y: 80, opacity: 0, scale: 0.9, stagger: 0.18, duration: 1.1, ease: "back.out(1.4)" }, 0.6);
-
-      gsap.utils.toArray<HTMLElement>(".float-card").forEach((el, i) => {
-        gsap.to(el, { y: i % 2 ? 14 : -14, duration: 2.6 + i * 0.4, repeat: -1, yoyo: true, ease: "sine.inOut" });
-      });
-      gsap.utils.toArray<HTMLElement>(".float-card .bar > i").forEach((el) => {
-        gsap.to(el, { width: el.dataset.w + "%", duration: 1.6, delay: 1.4, ease: "power2.out" });
-      });
-      const o = { v: 0 };
-      gsap.to(o, { v: 78, duration: 2, delay: 1.2, ease: "power2.out", onUpdate: () => { const e = document.querySelector("#hero-score"); if (e) e.textContent = String(Math.round(o.v)); } });
-
-      // hero visual parallax on scroll
-      gsap.to(".hero-visual", { yPercent: -12, scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: true } });
-      gsap.to(".hero-copy", { yPercent: 10, opacity: 0.2, scrollTrigger: { trigger: ".hero", start: "20% top", end: "bottom top", scrub: true } });
-
-      // ---- marquee ----
-      gsap.to(".marquee-track", { xPercent: -50, duration: 28, ease: "none", repeat: -1 });
-
-      // ---- generic section reveals ----
-      gsap.utils.toArray<HTMLElement>(".section-head").forEach((el) => {
-        gsap.from(el.children, { y: 50, opacity: 0, stagger: 0.12, duration: 0.9, ease: "power3.out", scrollTrigger: { trigger: el, start: "top 82%" } });
-      });
-      gsap.utils.toArray<HTMLElement>("[data-stagger]").forEach((el) => {
-        gsap.from(el.children, { y: 60, opacity: 0, scale: 0.96, stagger: 0.09, duration: 0.9, ease: "power3.out", scrollTrigger: { trigger: el, start: "top 80%" } });
-      });
-
-      // ---- problem compare ----
-      gsap.from(".cmp-bad", { x: -80, opacity: 0, duration: 1, ease: "power3.out", scrollTrigger: { trigger: ".compare", start: "top 78%" } });
-      gsap.from(".cmp-good", { x: 80, opacity: 0, duration: 1, ease: "power3.out", scrollTrigger: { trigger: ".compare", start: "top 78%" } });
-      gsap.from(".strike", { backgroundSize: "0% 2px", duration: 1.2, ease: "power2.inOut", scrollTrigger: { trigger: ".compare", start: "top 65%" } });
-
-      // ---- pinned horizontal workflow (desktop/tablet only) ----
-      mm.add("(min-width: 701px)", () => {
-        const track = document.querySelector<HTMLElement>(".pin-track");
-        if (!track) return;
-        const dist = () => track.scrollWidth - window.innerWidth;
-        gsap.to(track, {
-          x: () => -dist(),
-          ease: "none",
-          scrollTrigger: { trigger: ".pin-wrap", start: "top top", end: () => "+=" + dist(), pin: true, scrub: 0.8, invalidateOnRefresh: true, anticipatePin: 1 },
-        });
-        gsap.from(".step-card", { opacity: 0.2, scale: 0.92, stagger: 0.1, scrollTrigger: { trigger: ".pin-wrap", start: "top 60%", end: "top top", scrub: true } });
-      });
-      mm.add("(max-width: 700px)", () => {
-        gsap.from(".step-card", { y: 50, opacity: 0, stagger: 0.1, scrollTrigger: { trigger: ".pin-track", start: "top 85%" } });
-      });
-
-      // ---- workflow image ----
-      gsap.from(".diagram", { scale: 0.92, opacity: 0, y: 60, duration: 1.2, ease: "power3.out", scrollTrigger: { trigger: ".diagram", start: "top 85%" } });
-
-      // ---- score bars ----
-      gsap.utils.toArray<HTMLElement>(".score-demo .bar > i").forEach((el) => {
-        gsap.to(el, { width: el.dataset.w + "%", duration: 1.4, ease: "power2.out", scrollTrigger: { trigger: el, start: "top 90%" } });
-      });
-      gsap.utils.toArray<HTMLElement>(".score-demo [data-count]").forEach((el) => {
-        const o2 = { v: 0 };
-        gsap.to(o2, { v: Number(el.dataset.count), duration: 1.6, ease: "power2.out", scrollTrigger: { trigger: el, start: "top 90%" }, onUpdate: () => { el.textContent = String(Math.round(o2.v)); } });
-      });
-
-      // ---- metrics counters ----
-      gsap.utils.toArray<HTMLElement>(".metric b").forEach((el) => {
-        const o3 = { v: 0 };
-        gsap.to(o3, { v: Number(el.dataset.count), duration: 2, ease: "power2.out", scrollTrigger: { trigger: el, start: "top 88%" }, onUpdate: () => { el.textContent = Math.round(o3.v) + "%"; } });
-      });
-
-      // ---- timeline fill (scrubbed) ----
-      gsap.fromTo(".tl-fill", { height: 0 }, { height: "calc(100% - .8rem)", ease: "none", scrollTrigger: { trigger: ".tl", start: "top 70%", end: "bottom 60%", scrub: true } });
-      gsap.utils.toArray<HTMLElement>(".tl-item").forEach((el) => {
-        gsap.from(el, { x: 60, opacity: 0, duration: 0.8, ease: "power3.out", scrollTrigger: { trigger: el, start: "top 85%" } });
-      });
-
-      // ---- CTA ----
-      gsap.from(".cta-box", { scale: 0.9, opacity: 0, duration: 1, ease: "power3.out", scrollTrigger: { trigger: ".cta-box", start: "top 85%" } });
-
-      // ---- card tilt ----
-      gsap.utils.toArray<HTMLElement>(".agent, .tilt").forEach((card) => {
-        const rx = gsap.quickTo(card, "rotationX", { duration: 0.4 });
-        const ry = gsap.quickTo(card, "rotationY", { duration: 0.4 });
-        gsap.set(card, { transformPerspective: 900 });
-        card.addEventListener("mousemove", (e) => {
-          const r = card.getBoundingClientRect();
-          ry(((e.clientX - r.left) / r.width - 0.5) * 8);
-          rx(-((e.clientY - r.top) / r.height - 0.5) * 8);
-        });
-        card.addEventListener("mouseleave", () => { rx(0); ry(0); });
-      });
-
-      return () => mm.revert();
-    },
-    { scope: root }
-  );
-
+export default function Home() {
   return (
-    <div ref={root}>
-      <nav className="nav">
-        <Link href="/" className="brand"><span className="logo">R</span>SkillOra</Link>
-        <div className="nav-links">
-          <Link href="/how-it-works">How it works</Link><a href="#problem">Problem</a><a href="#workflow">Workflow</a><a href="#agents">Agents</a><a href="#score">Scoring</a><a href="#team">Team</a>
-        </div>
-        <div className="row" style={{ gap: ".6rem" }}><Link href="/login" className="btn sm">Log in</Link><Link href="/login" className="btn primary sm">Get started →</Link></div>
-      </nav>
+    <div className="h-screen w-screen max-h-screen overflow-hidden bg-[#FAF9F5] text-[#141A16] relative flex flex-col justify-between selection:bg-[#DCFCE7] selection:text-[#166534]">
+      
+      {/* Ambient background soft glow orbs matching reference */}
+      <div className="absolute top-[-15%] left-[-8%] w-[500px] h-[500px] rounded-full bg-[#E5F5E6]/70 blur-[120px] pointer-events-none -z-10" />
+      <div className="absolute top-[-5%] right-[-10%] w-[550px] h-[550px] rounded-full bg-[#FEF9C3]/50 blur-[130px] pointer-events-none -z-10" />
+      <div className="absolute bottom-[-15%] left-[25%] w-[650px] h-[500px] rounded-full bg-[#DCFCE7]/45 blur-[150px] pointer-events-none -z-10" />
 
-      {/* ============ HERO ============ */}
-      <header className="hero wrap">
-        <div className="hero-grid">
-          <div className="hero-copy">
-            <span className="eyebrow">Agentic AI · Resume Intelligence</span>
-            <h1 className="display" style={{ marginTop: "1.4rem" }}>
-              <span className="line"><span>One verified profile.</span></span>
-              <span className="line"><span className="grad-text">Every resume, tailored.</span></span>
-            </h1>
-            <p className="lead" style={{ marginTop: "1.8rem" }}>
-              SkillOra keeps a source-linked fact ledger of everything you have built, then tailors a resume per job description — never inventing a detail — and explains your job-fit score line by line.
-            </p>
-            <div className="hero-actions">
-              <Link href="/login" className="btn primary">Create your account →</Link>
-              <a href="#workflow" className="btn">See how it works</a>
-            </div>
-            <div className="hero-stats">
-              <div><b>9</b><span>cooperating agents</span></div>
-              <div><b>5</b><span>score components</span></div>
-              <div><b>0</b><span>fabricated claims</span></div>
-            </div>
+      {/* Navigation Bar */}
+      <header className="w-full max-w-7xl mx-auto px-6 lg:px-12 pt-4 pb-2 flex items-center justify-between shrink-0">
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <div className="relative w-7 h-7 transition-transform group-hover:rotate-12 duration-300">
+            <Image 
+              src="/logo.png" 
+              alt="Skillora Logo" 
+              width={30} 
+              height={30} 
+              className="object-contain"
+              priority
+            />
           </div>
+          <span className="text-xl font-serif font-bold tracking-tight text-[#141A16]">
+            Skillora
+          </span>
+        </Link>
 
-          <div className="hero-visual">
-            <div className="float-card one">
-              <div className="row between"><span className="chip green"><i className="dot" /> verified</span><span className="mono muted">F101</span></div>
-              <p style={{ marginTop: ".8rem", fontWeight: 600 }}>Built a multi-agent resume pipeline with CrewAI + Google ADK.</p>
-              <p className="muted small" style={{ marginTop: ".5rem" }}>“…orchestrates CrewAI flows with Google ADK sub-agents…”</p>
-            </div>
-            <div className="float-card two">
-              <div className="row between"><b>Job-fit score</b><span className="chip blue">explainable</span></div>
-              <div style={{ fontFamily: "var(--font-display)", fontSize: "4.4rem", lineHeight: 1.1 }}><span id="hero-score">0</span><span className="muted" style={{ fontSize: "1.3rem" }}>/100</span></div>
-              <div className="stack" style={{ gap: ".5rem" }}>
-                <div className="bar"><i data-w="82" style={{ ["--c" as string]: "var(--c-green)" }} /></div>
-                <div className="bar"><i data-w="70" style={{ ["--c" as string]: "var(--c-blue)" }} /></div>
-                <div className="bar"><i data-w="88" style={{ ["--c" as string]: "var(--c-violet)" }} /></div>
-              </div>
-            </div>
-            <div className="float-card three">
-              <div className="row between"><span className="chip rose">Verifier</span><span className="chip">blocked 1 claim</span></div>
-              <p style={{ marginTop: ".8rem", fontSize: ".92rem" }}><span className="muted">Draft:</span> “Improved accuracy by 40%”</p>
-              <p className="small" style={{ color: "var(--c-rose)", marginTop: ".3rem" }}>✕ No source span supports “40%”. Sent back to Writer.</p>
-            </div>
-          </div>
+        {/* Center Nav Links */}
+        <nav className="hidden md:flex items-center gap-7 text-xs font-medium text-[#465048]">
+          <Link href="/sources" className="hover:text-[#141A16] transition-colors flex items-center gap-1">
+            <span>Sources</span>
+          </Link>
+          <Link href="/verify" className="hover:text-[#141A16] transition-colors">
+            Fact Ledger
+          </Link>
+          <Link href="/job" className="hover:text-[#141A16] transition-colors">
+            Job Match
+          </Link>
+          <Link href="/tailor" className="hover:text-[#141A16] transition-colors">
+            Tailor & Chat
+          </Link>
+          <Link href="/how-it-works" className="hover:text-[#141A16] transition-colors">
+            How It Works
+          </Link>
+        </nav>
+
+        {/* Right CTA */}
+        <div className="flex items-center gap-4">
+          <Link 
+            href="/login" 
+            className="hidden sm:inline-block text-xs font-medium text-[#465048] hover:text-[#141A16] transition-colors"
+          >
+            Sign In
+          </Link>
+          <Link 
+            href="/sources" 
+            className="px-4 py-2 bg-[#121614] hover:bg-black text-white text-xs font-medium rounded-full shadow-sm hover:shadow transition-all flex items-center gap-1.5"
+          >
+            <span>Get Started</span>
+            <span className="text-[11px]">→</span>
+          </Link>
         </div>
       </header>
 
-      <div className="marquee">
-        <div className="marquee-track">
-          {[...marquee, ...marquee].map((m, i) => <span key={i}>{m}</span>)}
-        </div>
-      </div>
+      {/* Hero Section (Non-scrollable, perfectly fitted) */}
+      <main className="flex-1 w-full max-w-6xl mx-auto px-4 flex flex-col items-center justify-between min-h-0 pt-2 pb-0">
+        
+        {/* Main Headline & CTAs */}
+        <div className="text-center max-w-3xl mx-auto space-y-2 shrink-0">
+          <h1 className="text-4xl sm:text-5xl lg:text-[62px] font-serif font-normal text-[#121614] tracking-[-0.035em] leading-[1.06]">
+            One Profile.<br />
+            <span className="relative inline-block">
+              A Resume
+              {/* Hand-drawn sage green brush underline */}
+              <svg 
+                className="absolute -bottom-1.5 left-0 w-full text-[#9FD4A2] pointer-events-none" 
+                viewBox="0 0 270 14" 
+                fill="none"
+              >
+                <path 
+                  d="M4 10.5C70 4.2 205 3.5 266 9.8" 
+                  stroke="currentColor" 
+                  strokeWidth="4" 
+                  strokeLinecap="round" 
+                />
+              </svg>
+            </span> for Every Job.
+          </h1>
 
-      {/* ============ PROBLEM ============ */}
-      <section className="section wrap" id="problem">
-        <div className="section-head">
-          <span className="eyebrow">The problem</span>
-          <h2 className="h2">Generic AI invents. ATS tools hide.</h2>
-          <p className="lead">Candidates re-tailor the same resume for every application, and the tools they reach for fail in two ways.</p>
-        </div>
-        <div className="compare">
-          <div className="card cmp-bad glow-line" style={{ ["--tone" as string]: "var(--c-rose)" }}>
-            <span className="chip rose">Today</span>
-            <h3 className="h3" style={{ margin: "1rem 0" }}>Chat-based tailoring &amp; paywalled ATS</h3>
-            <ul className="stack muted" style={{ listStyle: "none" }}>
-              <li>✕ Omits a component or attaches the <span className="strike" style={{ backgroundImage: "linear-gradient(var(--c-rose),var(--c-rose))", backgroundRepeat: "no-repeat", backgroundPosition: "0 60%", backgroundSize: "100% 2px" }}>wrong technology</span></li>
-              <li>✕ Changes a metric or invents a plausible-sounding description</li>
-              <li>✕ Same resume + JD gives different scores run to run</li>
-              <li>✕ Reasoning and breakdown hidden behind paid tiers</li>
-            </ul>
-          </div>
-          <div className="card cmp-good glow-line">
-            <span className="chip green">With SkillOra</span>
-            <h3 className="h3" style={{ margin: "1rem 0" }}>A ledger of facts, an engine of proof</h3>
-            <ul className="stack" style={{ listStyle: "none" }}>
-              <li>✓ Every claim cites a quoted source span and a fact ID</li>
-              <li>✓ A Verifier agent blocks anything the source can’t support</li>
-              <li>✓ Scoring is plain Python — identical input, identical score</li>
-              <li>✓ Five components, visible evidence, ranked fixes. Free.</li>
-            </ul>
-          </div>
-        </div>
-      </section>
+          <p className="text-[#556056] text-xs sm:text-sm font-normal max-w-xl mx-auto leading-relaxed">
+            Turn your verified projects and experience into tailored resumes with clear, explainable job-fit insights.
+          </p>
 
-      {/* ============ PINNED WORKFLOW ============ */}
-      <section id="workflow" className="pin-wrap">
-        <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", gap: "3rem" }}>
-          <div className="wrap section-head" style={{ marginBottom: 0 }}>
-            <span className="eyebrow">Workflow</span>
-            <h2 className="h2">From scattered sources to a verified resume</h2>
+          {/* Action Buttons */}
+          <div className="pt-2 flex items-center justify-center gap-3">
+            <Link 
+              href="/sources" 
+              className="px-6 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-medium text-xs sm:text-sm shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
+            >
+              <span>Get Started Free</span>
+              <span>→</span>
+            </Link>
+
+            <Link 
+              href="/verify" 
+              className="px-5 py-2.5 bg-white hover:bg-[#F4F3ED] text-[#141A16] border border-[#DDD9CE] rounded-full font-medium text-xs sm:text-sm shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
+            >
+              <span className="w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center text-[8px] pl-0.5">▶</span>
+              <span>Explore Demo</span>
+            </Link>
           </div>
-          <div className="pin-track">
-            {steps.map((s, i) => (
-              <div key={i} className="card step-card tilt">
-                <div className="row between"><span className="chip">{s.phase}</span><span className="chip violet">{s.tag}</span></div>
-                <div className="step-n grad-text">{String(i + 1).padStart(2, "0")}</div>
-                <h3 className="h3">{s.t}</h3>
-                <p className="muted">{s.d}</p>
+        </div>
+
+        {/* Floating Interactive Device Showcase Area with 3D inward perspective tilt */}
+        <div className="w-full relative flex-1 flex items-end justify-center max-w-4xl min-h-0 mt-2 [perspective:1100px]">
+          
+          {/* Card 1: Top Left Floating Photo (Verified Projects) */}
+          <div className="hidden lg:block absolute top-2 -left-12 z-20 animate-float-1 pointer-events-none">
+            <div className="relative p-1.5 bg-white/95 rounded-2xl shadow-xl shadow-slate-300/40 border border-[#E9E6DC] -rotate-3">
+              <div className="relative w-40 h-28 rounded-xl overflow-hidden">
+                <Image 
+                  src="/workspace.jpg" 
+                  alt="Workspace" 
+                  fill 
+                  className="object-cover"
+                />
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section wrap">
-        <img className="diagram card flat" src="/workflow.webp" loading="lazy" decoding="async" width={1536} height={1024} alt="SkillOra two-phase workflow diagram" style={{ width: "100%", padding: "1rem", background: "#fff" }} />
-      </section>
-
-      {/* ============ AGENTS ============ */}
-      <section className="section wrap" id="agents">
-        <div className="section-head">
-          <span className="eyebrow">The agent team</span>
-          <h2 className="h2">Nine specialists, one rule: no claim without a source</h2>
-          <p className="lead">CrewAI Flows run the deterministic analysis pipeline; Google ADK runs the interactive, stateful tailoring side.</p>
-        </div>
-        <div className="grid g3" data-stagger>
-          {agents.map((a) => (
-            <div key={a.name} className={`card agent glow-line tone-${a.tone}`}>
-              <div className="row"><h3 className="h3">{a.name}</h3><span className="chip fw">{a.fw}</span></div>
-              <p className="muted" style={{ marginTop: ".9rem" }}>{a.role}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ============ SCORE ============ */}
-      <section className="section wrap" id="score">
-        <div className="grid g2 score-demo" style={{ alignItems: "center", gap: "4rem" }}>
-          <div className="section-head" style={{ marginBottom: 0 }}>
-            <span className="eyebrow">Explainable scoring</span>
-            <h2 className="h2">A score you can argue with</h2>
-            <p className="lead">Five weighted components, each with visible evidence. Because it is deterministic code — not an LLM — the same resume and JD always produce the same number.</p>
-            <Link href="/score" className="btn" style={{ justifySelf: "start" }}>Open a sample report →</Link>
-          </div>
-          <div className="card flat">
-            {scoreComponents.map((c) => (
-              <div key={c.key} className="comp">
-                <div className="row between"><span>{c.key} <span className="muted small">· {c.weight}%</span></span><b data-count={c.value}>0</b></div>
-                <div className="bar"><i data-w={c.value} style={{ ["--c" as string]: c.color }} /></div>
+              <div className="absolute -bottom-3 left-3 bg-[#F5ECFE] text-[#7E22CE] border border-[#E9D5FF] px-2.5 py-0.5 rounded-full text-[10px] font-semibold shadow-md flex items-center gap-1">
+                <span>📁</span>
+                <span>Verified Projects</span>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============ EVAL ============ */}
-      <section className="section wrap">
-        <div className="section-head">
-          <span className="eyebrow">Evaluation</span>
-          <h2 className="h2">Measured, not claimed</h2>
-          <p className="lead">Four metrics tracked on an evaluation set, each owned by a team member.</p>
-        </div>
-        <div className="grid g4" data-stagger>
-          {evalMetrics.map((m) => (
-            <div key={m.label} className="card metric tilt">
-              <div className="stat"><b className="grad-text" data-count={m.value}>0%</b><span>{m.label}</span></div>
-              <span className="chip" style={{ marginTop: "1.2rem" }}>Owner · {m.owner}</span>
             </div>
-          ))}
-        </div>
-        <p className="muted small" style={{ marginTop: "1rem" }}>Figures shown are illustrative demo values pending the final evaluation run.</p>
-      </section>
-
-      {/* ============ TIMELINE ============ */}
-      <section className="section wrap">
-        <div className="grid g2" style={{ gap: "4rem", alignItems: "start" }}>
-          <div className="section-head" style={{ position: "sticky", top: "7rem" }}>
-            <span className="eyebrow">Roadmap</span>
-            <h2 className="h2">Six weeks, seven screens, one demo</h2>
-            <p className="lead">Local-first on a laptop, then containerised and deployed with a public URL.</p>
           </div>
-          <div className="tl">
-            <div className="tl-fill" />
-            {timeline.map((t) => (
-              <div key={t.title} className="tl-item">
-                <span className="chip green">{t.when}</span>
-                <h3 className="h3" style={{ margin: ".6rem 0 .3rem" }}>{t.title}</h3>
-                <p className="muted">{t.out}</p>
+
+          {/* Card 2: Bottom Left Floating Widget (92% Job Fit Score) */}
+          <div className="hidden lg:block absolute bottom-12 -left-14 z-20 animate-float-2 pointer-events-none">
+            <div className="bg-[#FAF7F0]/95 backdrop-blur-md p-3.5 rounded-2xl border border-[#EBE7DD] shadow-xl shadow-slate-300/50 w-52 -rotate-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">📊</span>
+                  <span className="text-2xl font-black text-[#141A16] tracking-tight">92%</span>
+                </div>
+                <div className="w-6 h-6 rounded-full bg-[#EFECE3] flex items-center justify-center text-[10px] font-bold text-slate-700">
+                  ↗
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============ STACK ============ */}
-      <section className="section wrap">
-        <div className="section-head">
-          <span className="eyebrow">Stack</span>
-          <h2 className="h2">Runs entirely on a laptop</h2>
-        </div>
-        <div className="row wrapflex" data-stagger style={{ gap: ".8rem" }}>
-          {["Next.js", "FastAPI", "SQLAlchemy + SQLite", "CrewAI", "Google ADK", "Gemini", "Ollama (optional)", "sentence-transformers", "RapidFuzz", "pdfplumber", "python-docx", "python-pptx", "Jinja + WeasyPrint", "GitHub REST API", "Docker Compose", "GSAP"].map((s) => (
-            <span key={s} className="chip" style={{ fontSize: "1rem", padding: ".6rem 1.2rem" }}>{s}</span>
-          ))}
-        </div>
-      </section>
-
-      {/* ============ TEAM ============ */}
-      <section className="section wrap" id="team">
-        <div className="section-head">
-          <span className="eyebrow">Team</span>
-          <h2 className="h2">Four builders, one pipeline</h2>
-        </div>
-        <div className="grid g4" data-stagger>
-          {team.map((m) => (
-            <div key={m.id} className="card tilt">
-              <div className="brand"><span className="logo" style={{ width: "3.4rem", height: "3.4rem", fontSize: "1.3rem" }}>{m.name[0]}</span></div>
-              <h3 className="h3" style={{ marginTop: "1.2rem" }}>{m.name}</h3>
-              <p className="mono muted" style={{ margin: ".3rem 0 .8rem" }}>{m.id}</p>
-              <p className="muted small">{m.role}</p>
+              <p className="text-[10px] font-semibold text-[#6A756D] mt-0.5">Job Fit Score</p>
+              
+              <div className="w-full h-2 bg-[#E6E2D8] rounded-full overflow-hidden mt-2">
+                <div className="h-full bg-[#1E6B38] rounded-full w-[92%]"></div>
+              </div>
             </div>
-          ))}
-        </div>
-      </section>
+          </div>
 
-      {/* ============ CTA ============ */}
-      <section className="section wrap">
-        <div className="card flat cta-box glow-line" style={{ textAlign: "center", padding: "6rem 2rem" }}>
-          <h2 className="display" style={{ fontSize: "4.4rem" }}>See it <span className="grad-text">work.</span></h2>
-          <p className="lead" style={{ margin: "1.4rem auto 2.4rem" }}>Walk through all seven screens with a live, interactive demo.</p>
-          <Link href="/login" className="btn primary">Get started →</Link>
-        </div>
-      </section>
+          {/* Card 3: Top Right Floating Card (Tailored Resume & Sparkles) */}
+          <div className="hidden lg:block absolute top-2 -right-10 z-20 animate-float-2 pointer-events-none">
+            <div className="relative bg-[#EDF8EE]/95 backdrop-blur-md p-4 rounded-2xl border border-[#D5EED8] shadow-xl shadow-slate-300/40 w-56 rotate-3">
+              {/* Yellow sunburst energy lines */}
+              <div className="absolute -top-3 -right-2.5 text-[#F59E0B] font-black text-xs select-none">
+                ///
+              </div>
 
-      <footer className="footer">
-        <span>© SkillOra · Agentic AI Project</span>
-        <span>Palak Bhatt · Manya Agarwal · Vanshik Soni · Harman Singh Kanwar</span>
-      </footer>
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                  <span className="text-sm">📄</span>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-[#141A16] flex items-center gap-1">
+                    Tailored Resume
+                    <span className="text-emerald-600 text-[10px]">✦</span>
+                  </h4>
+                  <p className="text-[10px] text-[#526056] mt-0.5 leading-snug">
+                    Built from your real experience. No made-up claims.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: Bottom Right Floating Candidate Card (More Interviews) */}
+          <div className="hidden lg:block absolute bottom-12 -right-8 z-20 animate-float-1 pointer-events-none">
+            <div className="relative p-1.5 bg-white/95 rounded-2xl shadow-xl shadow-slate-300/40 border border-[#E9E6DC] rotate-3">
+              <div className="relative w-36 h-28 rounded-xl overflow-hidden">
+                <Image 
+                  src="/candidate.jpg" 
+                  alt="Candidate" 
+                  fill 
+                  className="object-cover"
+                />
+              </div>
+              <div className="absolute -bottom-3 right-1 bg-white text-[#141A16] border border-[#E5E2D8] px-2.5 py-0.5 rounded-full text-[10px] font-semibold shadow-md flex items-center gap-1 whitespace-nowrap">
+                <span className="text-emerald-600 font-bold">📈</span>
+                <span>More interviews for the right roles.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Decorative Sparkles */}
+          <div className="hidden lg:block absolute top-4 left-1/4 text-slate-400 text-sm select-none pointer-events-none">✦</div>
+          <div className="hidden lg:block absolute top-14 right-1/4 text-slate-700 text-xs select-none pointer-events-none">✦</div>
+          <div className="hidden lg:block absolute bottom-20 right-1/3 text-emerald-700 text-[10px] select-none pointer-events-none">✦</div>
+
+          {/* Central Inward-Tilted Tablet Frame with Bottom Blur */}
+          <div 
+            className="w-full max-w-3xl relative [transform-style:preserve-3d] transition-transform duration-700 select-none"
+            style={{
+              transform: 'rotateX(18deg) translateY(24px)',
+              transformOrigin: 'bottom center',
+            }}
+          >
+            {/* Tablet Casing */}
+            <div 
+              className="relative bg-[#181C19] p-2.5 sm:p-3.5 rounded-t-[32px] sm:rounded-t-[42px] rounded-b-xl shadow-2xl shadow-slate-900/40 border-t-4 border-x-4 border-b-0 border-[#2D352F] overflow-hidden"
+              style={{
+                maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 50%, rgba(0,0,0,0.7) 75%, rgba(0,0,0,0) 100%)',
+                WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 50%, rgba(0,0,0,0.7) 75%, rgba(0,0,0,0) 100%)',
+              }}
+            >
+              
+              {/* Display Window */}
+              <div className="bg-white rounded-t-[22px] sm:rounded-t-[30px] rounded-b-none overflow-hidden border border-slate-200">
+                
+                {/* Window Header with traffic light dots */}
+                <div className="bg-[#FAF9F5] px-4 py-2 border-b border-slate-200 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#EF4444]" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#10B981]" />
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-400 truncate max-w-xs">
+                    skillora.ai/tailor/workspace
+                  </div>
+                  <div className="w-8"></div>
+                </div>
+
+                {/* Inside App Workspace */}
+                <div className="grid grid-cols-1 md:grid-cols-12 h-[290px] sm:h-[330px]">
+                  
+                  {/* App Sidebar */}
+                  <div className="hidden md:flex md:col-span-3 bg-[#FAF9F5] border-r border-slate-200 p-3.5 flex-col justify-between">
+                    <div className="space-y-3.5">
+                      <div className="flex items-center gap-2 px-1 py-0.5">
+                        <Image src="/logo.png" alt="Logo" width={20} height={20} />
+                        <span className="font-serif font-bold text-sm text-[#141A16]">Skillora</span>
+                      </div>
+
+                      <nav className="space-y-1">
+                        <Link 
+                          href="/sources"
+                          className="w-full text-left px-3 py-1.5 rounded-full text-xs font-semibold bg-[#EAF4EB] text-[#1E6B38] flex items-center gap-2 transition-colors"
+                        >
+                          <span className="text-xs">📥</span>
+                          <span>1. Sources</span>
+                        </Link>
+                        <Link 
+                          href="/verify"
+                          className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-2"
+                        >
+                          <span>⚖️</span>
+                          <span>2. Verify</span>
+                        </Link>
+                        <Link 
+                          href="/job"
+                          className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-2"
+                        >
+                          <span>🎯</span>
+                          <span>3. Job Match</span>
+                        </Link>
+                        <Link 
+                          href="/tailor"
+                          className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-2"
+                        >
+                          <span>✨</span>
+                          <span>4. Tailor</span>
+                        </Link>
+                      </nav>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200 px-1">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-full bg-emerald-700 text-white text-[9px] font-bold flex items-center justify-center">
+                          P
+                        </div>
+                        <div className="truncate">
+                          <p className="text-[10px] font-semibold text-slate-800">Palak Bhatt</p>
+                          <p className="text-[8px] text-emerald-700 font-medium">Ledger Grounded</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Main Resume Canvas */}
+                  <div className="md:col-span-9 p-5 sm:p-6 flex flex-col justify-between bg-white overflow-hidden">
+                    
+                    <div className="space-y-3.5">
+                      {/* Top Bar inside app */}
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div>
+                          <h3 className="text-lg font-serif font-bold text-[#141A16]">Tailored Resume</h3>
+                          <p className="text-xs text-slate-500 mt-0.5">Software Engineer · Production Ready</p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Link 
+                            href="/tailor" 
+                            className="px-3 py-1 rounded-full bg-[#F3F2EC] hover:bg-[#EBE9E0] text-xs font-medium text-slate-800 border border-[#DCD9CE] flex items-center gap-1 transition-all shadow-sm"
+                          >
+                            <span>✎</span>
+                            <span>Edit</span>
+                          </Link>
+                          <Link
+                            href="/export"
+                            className="px-3.5 py-1 bg-[#141A16] hover:bg-black text-white text-xs font-medium rounded-full flex items-center gap-1.5 shadow-sm transition-all"
+                          >
+                            <span>⤓</span>
+                            <span>Export</span>
+                          </Link>
+                        </div>
+                      </div>
+
+                      {/* Resume Body with Grounded Claims */}
+                      <div className="space-y-2 text-xs">
+                        <div>
+                          <h4 className="font-bold text-slate-900 text-xs tracking-tight">Experience</h4>
+                          <div className="mt-2 space-y-2.5">
+                            <div className="flex items-start gap-2">
+                              <span className="text-[#1E6B38] font-bold">•</span>
+                              <p className="text-slate-700 leading-relaxed text-[11px] sm:text-xs">
+                                Engineered a multi-agent resume tailoring pipeline using <span className="font-semibold text-slate-900">CrewAI</span> and <span className="font-semibold text-slate-900">Google ADK</span> with deterministic fact grounding.
+                              </p>
+                            </div>
+
+                            <div className="flex items-start gap-2">
+                              <span className="text-[#1E6B38] font-bold">•</span>
+                              <div className="text-slate-700 leading-relaxed text-[11px] sm:text-xs">
+                                Implemented a 5-component explainable ATS scoring engine with <span className="font-semibold text-slate-900">RapidFuzz</span> and vector semantic matching.
+                                <span className="inline-block w-28 h-2.5 bg-[#BFE5C6] rounded-full align-middle ml-2 opacity-90" />
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-1">
+                              <span className="text-slate-400 font-bold">•</span>
+                              <div className="w-3/4 h-2 bg-[#EBE9E1] rounded-full" />
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-400 font-bold">•</span>
+                              <div className="w-4/5 h-2 bg-[#EBE9E1] rounded-full" />
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-400 font-bold">•</span>
+                              <div className="w-3/5 h-2 bg-[#EBE9E1] rounded-full" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom Link to Action */}
+                    <div className="pt-2 flex items-center justify-between text-[10px] text-slate-400">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span className="text-slate-600 font-medium">0% Hallucination Verifier Active</span>
+                      </div>
+                      <Link 
+                        href="/sources"
+                        className="font-semibold text-emerald-700 hover:text-emerald-900 flex items-center gap-1"
+                      >
+                        <span>Launch Workflow</span>
+                        <span>→</span>
+                      </Link>
+                    </div>
+
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Seamless Bottom Gradient Blur & Fade to Background Canvas */}
+            <div className="absolute -bottom-6 inset-x-0 h-32 sm:h-44 bg-gradient-to-t from-[#FAF9F5] via-[#FAF9F5]/85 to-transparent pointer-events-none z-30" />
+          </div>
+
+        </div>
+
+      </main>
+
     </div>
   );
 }

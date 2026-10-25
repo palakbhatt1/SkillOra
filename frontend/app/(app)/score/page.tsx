@@ -1,111 +1,189 @@
 "use client";
+
 import Link from "next/link";
-import { PageHead } from "@/components/AppShell";
 import ScoreRing from "@/components/ScoreRing";
 import { useStore } from "@/lib/store";
 
-export default function Score() {
-  const { score, components, recs, facts, keywords, live, analyzed, mode, scoreProfile, profiles, setScoreProfile, eligibility } = useStore();
-  const pending = facts.filter((f) => f.status === "pending").length;
-  const open = keywords.filter((k) => k.state === "suggested").length;
-  const showProfiles = live && analyzed && profiles.length > 0;
+export default function ScorePage() {
+  const { score, components, recs, facts, keywords, live, analyzed, scoreProfile, profiles, setScoreProfile, eligibility } = useStore();
+  const pendingCount = facts.filter((f) => f.status === "pending").length;
+  const openKeywords = keywords.filter((k) => k.state === "suggested").length;
+  const showProfiles = live && analyzed && profiles && profiles.length > 0;
 
   return (
-    <div>
-      <PageHead step={5} title="Score Report" sub="A deterministic job-fit score. Same resume and job always give the same number, and every point has a visible reason.">
-        <Link href="/export" className="btn primary">Export resume →</Link>
-      </PageHead>
+    <div className="space-y-8 max-w-6xl mx-auto">
+      
+      {/* Header section */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#1E6B38] bg-[#EAF4EB] px-2.5 py-0.5 rounded-full border border-[#C5E1CB]">
+              Stage 5 · Explainable Scoring
+            </span>
+            <span className="text-xs text-[#78827A]">Deterministic 5-Component ATS Engine</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-serif font-normal text-[#141A16] tracking-tight">
+            Job-Fit Score & Analysis
+          </h1>
+          <p className="text-sm text-[#556056] max-w-2xl leading-relaxed">
+            No black-box guesses. Skillora computes a transparent 0-100 score based on verified evidence, skill overlap, and role requirements.
+          </p>
+        </div>
 
-      {live && !analyzed ? (
-        <div className="card flat" data-in><p>No job analysed yet. <Link href="/job" style={{ color: "var(--c-green)" }}>Paste a job description first →</Link></p></div>
-      ) : (
-        <>
-          {showProfiles && (
-            <div className="card flat" data-in style={{ marginBottom: "1.6rem" }}>
-              <div className="row between wrapflex" style={{ gap: "1rem" }}>
-                <div>
-                  <b>Scoring profile</b>
-                  <p className="muted small">Different roles weigh things differently. Pick the profile that fits this job. The score updates instantly.</p>
-                </div>
-                <div className="tabs">
-                  {profiles.map((p) => (
-                    <button key={p.id} className={`tab ${scoreProfile?.id === p.id ? "on" : ""}`} onClick={() => setScoreProfile(p.id)} title={p.desc}>{p.label}</button>
-                  ))}
-                </div>
-              </div>
-              {scoreProfile && (
-                <p className="muted small" style={{ marginTop: ".9rem" }}>
-                  <b style={{ color: "var(--text)" }}>{scoreProfile.label}:</b> {scoreProfile.desc} Weights: skills {scoreProfile.weights.K}%, responsibilities {scoreProfile.weights.J}%, experience {scoreProfile.weights.E}%, evidence {scoreProfile.weights.Q}%, education {scoreProfile.weights.A}%.
-                  {" "}These are our own starting assumptions, not any company&apos;s formula.
-                </p>
-              )}
-            </div>
-          )}
+        <Link
+          href="/export"
+          className="px-6 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs sm:text-sm shadow-md transition-all shrink-0 flex items-center gap-1.5 self-start sm:self-auto"
+        >
+          <span>Proceed to Export</span>
+          <span>→</span>
+        </Link>
+      </div>
 
-          <div className="split even">
-            <div className="card flat" data-in style={{ display: "grid", placeItems: "center", gap: "1.6rem", padding: "3rem" }}>
-              <ScoreRing value={score} size={22} />
-              <div className="row wrapflex" style={{ justifyContent: "center" }}>
-                <span className="chip green">deterministic · plain Python</span>
-                <span className="chip amber">{pending} facts pending</span>
-                <span className="chip blue">{open} keyword suggestions open</span>
-              </div>
-              <p className="muted small" style={{ textAlign: "center", maxWidth: "32rem" }}>
-                Score = sum of weight × component. Skills are matched with importance weights and a required/preferred split; evidence quality is computed from your bullets.
-                It never rises from an unsupported claim.
-                {mode === "demo" && " (Demo data — start the backend for live scoring.)"}
-              </p>
+      {/* Role Profile Switcher */}
+      {showProfiles && (
+        <div className="bg-white p-5 rounded-2xl border border-[#ECE7DD] shadow-[0_2px_14px_rgba(0,0,0,0.02)] space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-[#141A16]">Scoring Weight Profile</h3>
+              <p className="text-xs text-[#78827A]">Adapt component weights based on target seniority and company size</p>
             </div>
 
-            <div className="card flat" data-in>
-              <h3 className="h3">Component breakdown</h3>
-              {components.map((c) => (
-                <div key={c.key} className="comp" style={{ opacity: c.scored === false ? 0.6 : 1 }}>
-                  <div className="row between">
-                    <b>{c.key}</b>
-                    <span>{c.scored === false ? <b>not scored</b> : <b data-count={c.value}>0</b>} <span className="muted small">· weight {c.weight}%</span></span>
-                  </div>
-                  <div className="bar"><i data-w={c.scored === false ? 0 : c.value} style={{ ["--c" as string]: c.color }} /></div>
-                  <p className="muted small">{c.why}</p>
-                </div>
-              ))}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {profiles.map((p) => {
+                const isActive = scoreProfile?.id === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setScoreProfile(p.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      isActive
+                        ? "bg-[#1E6B38] text-white shadow-sm"
+                        : "bg-[#FAF9F5] text-[#556056] border border-[#ECE7DD] hover:bg-white"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
-
-          {live && eligibility && (
-            <div className="card flat" data-in style={{ marginTop: "1.6rem", borderColor: eligibility.status === "eligible" ? "rgba(251,146,60,.5)" : "var(--c-rose)" }}>
-              <div className="row between wrapflex">
-                <h3 className="h3">Eligibility <span className="muted" style={{ fontWeight: 400, fontSize: "1rem" }}>(separate from the score)</span></h3>
-                <span className={`chip ${eligibility.status === "eligible" ? "green" : "rose"}`}>{eligibility.status === "eligible" ? "✓ eligible" : "needs review"}</span>
-              </div>
-              {eligibility.items.length > 0 && (
-                <p style={{ marginTop: ".7rem" }}><b>Required qualification not found in your resume:</b> {eligibility.items.join("; ")}</p>
-              )}
-              {eligibility.gaps.length > 0 && (
-                <p style={{ marginTop: ".5rem" }}><b>Required skills with no evidence yet:</b> {eligibility.gaps.join("; ")}</p>
-              )}
-              {eligibility.items.length === 0 && eligibility.gaps.length === 0 && <p className="muted" style={{ marginTop: ".7rem" }}>Every mandatory requirement has supporting evidence.</p>}
-              {eligibility.note && <p className="muted small" style={{ marginTop: ".6rem" }}>{eligibility.note}</p>}
-            </div>
-          )}
-
-          <div className="card flat" data-in style={{ marginTop: "1.6rem" }}>
-            <h3 className="h3" style={{ marginBottom: "1.2rem" }}>Top recommendations</h3>
-            <div className="grid g3">
-              {recs.map((r) => (
-                <div key={r.n} className="card rec" style={{ gridTemplateColumns: "auto 1fr" }}>
-                  <div className="n">{r.n}</div>
-                  <div>
-                    <div className="row between"><b>{r.title}</b><span className="chip green">{r.impact}</span></div>
-                    <p className="muted small" style={{ marginTop: ".4rem" }}>{r.detail}</p>
-                  </div>
-                </div>
-              ))}
-              {recs.length === 0 && <p className="muted">Nothing left to fix.</p>}
-            </div>
-          </div>
-        </>
+        </div>
       )}
+
+      {/* 2-Column Score Overview & Component Breakdown */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* Left Column: Radial ATS Gauge Card */}
+        <div className="lg:col-span-5 bg-white p-8 rounded-2xl border border-[#ECE7DD] shadow-[0_2px_14px_rgba(0,0,0,0.02)] flex flex-col items-center justify-center text-center space-y-6">
+          <ScoreRing value={score} size={200} />
+
+          <div className="space-y-2">
+            <h3 className="text-lg font-serif font-bold text-[#141A16]">
+              {score >= 80 ? "Exceptional Match" : score >= 60 ? "Competitive Match" : "Needs Targeted Polish"}
+            </h3>
+            <p className="text-xs text-[#556056] max-w-sm leading-relaxed">
+              Every point is backed by verified facts in your ledger. Fabricated claims are barred from boosting the score.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2 justify-center text-xs">
+            <span className="px-3 py-1 rounded-full bg-[#EAF4EB] text-[#1E6B38] font-semibold border border-[#C5E1CB]">
+              ✓ Deterministic Formula
+            </span>
+            {pendingCount > 0 && (
+              <span className="px-3 py-1 rounded-full bg-[#FEF3C7] text-[#92400E] font-semibold border border-[#FDE68A]">
+                ⚠️ {pendingCount} facts pending
+              </span>
+            )}
+            {openKeywords > 0 && (
+              <span className="px-3 py-1 rounded-full bg-[#EFF6FF] text-[#1D4ED8] font-semibold border border-[#DBEAFE]">
+                💡 {openKeywords} keyword suggestions
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Right Column: 5 Weighted Components Breakdown */}
+        <div className="lg:col-span-7 bg-white p-8 rounded-2xl border border-[#ECE7DD] shadow-[0_2px_14px_rgba(0,0,0,0.02)] space-y-5">
+          <div className="flex items-center justify-between border-b border-[#ECE7DD] pb-3">
+            <h3 className="text-base font-serif font-bold text-[#141A16]">Component Breakdown</h3>
+            <span className="text-xs text-[#78827A]">5 Weighted Dimensions</span>
+          </div>
+
+          <div className="space-y-4">
+            {components.map((c) => (
+              <div key={c.key} className="space-y-1.5 p-3 rounded-xl bg-[#FAF9F5] border border-[#ECE7DD]">
+                <div className="flex items-center justify-between text-xs sm:text-sm">
+                  <span className="font-bold text-[#141A16]">{c.key}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-[#1E6B38]">
+                      {c.scored === false ? "N/A" : `${Math.round(c.value)}/100`}
+                    </span>
+                    <span className="text-[11px] text-[#78827A]">({c.weight}% weight)</span>
+                  </div>
+                </div>
+
+                <div className="w-full h-2 bg-[#E5E1D5] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#2E9B4E] to-[#1E6B38] rounded-full transition-all duration-700"
+                    style={{ width: `${c.scored === false ? 0 : Math.min(c.value, 100)}%` }}
+                  />
+                </div>
+
+                {c.why && (
+                  <p className="text-[11px] text-[#556056] leading-relaxed pt-0.5">
+                    {c.why}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+
+      {/* Actionable Recommendations & Gaps */}
+      {recs && recs.length > 0 && (
+        <div className="bg-white p-6 rounded-2xl border border-[#ECE7DD] shadow-[0_2px_14px_rgba(0,0,0,0.02)] space-y-4">
+          <h3 className="text-base font-serif font-bold text-[#141A16]">Optimization Recommendations</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {recs.map((rec, i) => (
+              <div
+                key={i}
+                className="p-4 rounded-xl border border-[#ECE7DD] bg-[#FAF9F5] space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#1E6B38]">{rec.title}</span>
+                  <span className="text-[10px] font-semibold text-[#78827A] uppercase">
+                    {rec.impact || "High Impact"}
+                  </span>
+                </div>
+                <p className="text-xs text-[#556056] leading-relaxed">{rec.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Navigation */}
+      <div className="pt-4 flex items-center justify-between border-t border-[#ECE7DD]">
+        <Link
+          href="/tailor"
+          className="text-xs font-semibold text-[#556056] hover:text-[#141A16] flex items-center gap-1"
+        >
+          <span>← Back to Resume Editor</span>
+        </Link>
+
+        <Link
+          href="/export"
+          className="px-6 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-1.5"
+        >
+          <span>Continue to Export</span>
+          <span>→</span>
+        </Link>
+      </div>
+
     </div>
   );
 }
