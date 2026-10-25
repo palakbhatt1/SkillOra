@@ -79,10 +79,12 @@ export default function ScorePage() {
 
           <div className="space-y-2">
             <h3 className="text-lg font-serif font-bold text-[#141A16]">
-              {score >= 80 ? "Exceptional Match" : score >= 60 ? "Competitive Match" : "Needs Targeted Polish"}
+              {score === 0 ? "Awaiting Job Analysis" : score >= 80 ? "Exceptional Match" : score >= 60 ? "Competitive Match" : "Needs Targeted Polish"}
             </h3>
             <p className="text-xs text-[#556056] max-w-sm leading-relaxed">
-              Every point is backed by verified facts in your ledger. Fabricated claims are barred from boosting the score.
+              {score === 0
+                ? "Analyze a target job description in Stage 3 to compute an explainable, deterministic ATS score across 5 weighted dimensions."
+                : "Every point is backed by verified facts in your ledger. Fabricated claims are barred from boosting the score."}
             </p>
           </div>
 

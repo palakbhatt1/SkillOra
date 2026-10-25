@@ -53,7 +53,7 @@ export default function ExportPage() {
           ${profile.email || "palak@skillora.ai"} · ${profile.location || "Bengaluru"} · ${profile.links || "github.com/palakbhatt1"}
         </div>
         <h2>Professional Summary</h2>
-        <p style="font-size: 13px;">${summary || "Software Engineer specializing in agentic workflows and reliable LLM system design."}</p>
+        <p style="font-size: 13px;">${summary || "Grounded candidate profile synthesized from verified ledger facts."}</p>
         <h2>Experience &amp; Projects</h2>
         <ul>
           ${bullets.map((b) => `<li>${b.text} <span class="citation">[${b.facts.join(", ")}]</span></li>`).join("")}
@@ -63,6 +63,9 @@ export default function ExportPage() {
   `;
 
   const handleDownload = (fmt: "pdf" | "docx") => {
+    if (bullets.length === 0) {
+      return showToast("No resume bullets generated yet. Please complete Stage 3 & 4 first.");
+    }
     if (live && jobId) {
       window.location.href = api.exportUrl(jobId, fmt);
       return showToast(fmt === "pdf" ? "Downloading verified PDF resume..." : "Downloading Word DOCX resume...");

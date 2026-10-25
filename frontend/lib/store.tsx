@@ -72,7 +72,8 @@ interface Store {
 }
 
 const Ctx = createContext<Store | null>(null);
-const demoProfile: Profile = { name: "Aarav Mehta", email: "aarav@email.com", links: "github.com/aarav", location: "Bengaluru" };
+const demoProfile: Profile = { name: "Palak Bhatt", email: "palak@skillora.ai", links: "github.com/palakbhatt1", location: "Bengaluru, India" };
+const emptyMeta = { title: "", company: "", seniority: "", keywords: [] as string[] };
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -137,12 +138,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [job]);
 
   const value = useMemo<Store>(() => {
-    // ----- demo-mode derived values (same logic as the original static demo)
+    const isAnalyzed = live ? !!job : dAnalyzed;
     const verified = facts.filter((f) => f.status === "verified").length;
     const accepted = dKeywords.filter((k) => k.state === "accepted").length;
     const boost = Math.max(0, Math.min(verified - 5, 5)) + accepted * 2;
-    const demoScore = Math.max(60, Math.min(98, 74 + boost));
-    const demoComps = scoreComponents.map((c, i) => ({ ...c, value: Math.min(99, c.value + (i === 3 || i === 0 ? boost : Math.round(boost / 2))) }));
+    const demoScore = isAnalyzed ? Math.max(60, Math.min(98, 74 + boost)) : 0;
+    const defaultComps = scoreComponents.map((c) => ({ ...c, value: 0, why: "Awaiting job analysis." }));
+    const demoComps = isAnalyzed
+      ? scoreComponents.map((c, i) => ({ ...c, value: Math.min(99, 70 + (i === 3 || i === 0 ? boost : Math.round(boost / 2))) }))
+      : defaultComps;
 
     const ingestMsg = (r: { added: number; stale: number; mode: string; warnings: string[]; unchanged: boolean }) =>
       r.unchanged ? "No change since last time - nothing re-extracted." :
@@ -199,7 +203,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         flash(`${skill} added as a self-declared skill (no source proof, lower score weight).`);
       },
 
-      analyzed: live ? !!job : dAnalyzed,
+      analyzed: isAnalyzed,
       jd,
       analyze: async (text) => {
         setJd(text);
@@ -207,16 +211,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const j = await run("CrewAI flow: JD Analyzer then Matcher, then ADK Writer and Verifier", () => api.analyze(text));
         if (j) setJob(j);
       },
-      meta: live && job ? job.meta : jobMeta,
-      requirements: live && job ? job.requirements : seedReqs,
-      projects: live && job ? job.projects : dProjects,
+      meta: live && job ? job.meta : (isAnalyzed ? jobMeta : emptyMeta),
+      requirements: live && job ? job.requirements : (isAnalyzed ? seedReqs : []),
+      projects: live && job ? job.projects : (isAnalyzed ? dProjects : []),
       toggleProject: async (id) => {
         if (!live || !job) return setDProjects((ps) => ps.map((p) => (p.id === id ? { ...p, picked: !p.picked } : p)));
         const j = await run("Resume Writer + Verifier are rewriting the bullets for your new selection", () => api.toggleProject(job.id, id));
         if (j) setJob(j);
       },
-      summary: live && job ? job.resume.summary : dSummary,
-      bullets: live && job ? job.resume.bullets : dBullets,
+      summary: live && job ? job.resume.summary : (isAnalyzed ? dSummary : ""),
+      bullets: live && job ? job.resume.bullets : (isAnalyzed ? dBullets : []),
       skills: live && job ? job.resume.skills : [],
       setBullets: (b) => { if (!live) setDBullets(b); },
       editBullet: async (id, text) => {
@@ -239,7 +243,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const j = await run("ADK Resume Writer and Verifier loop", () => api.regenerate(job.id));
         if (j) setJob(j);
       },
-      keywords: live && job ? job.keywords : dKeywords,
+      keywords: live && job ? job.keywords : (isAnalyzed ? dKeywords : []),
       decideKeyword: async (id, accept) => {
         if (!live || !job) {
           setDKeywords((ks) => ks.map((k) => (k.id === id ? { ...k, state: accept ? "accepted" : "rejected" } : k)));
@@ -252,7 +256,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const j = await run("Saving", () => api.decideKeyword(job.id, id, accept));
         if (j) setJob(j);
       },
-      chat: live && job ? job.chat : dChat,
+      chat: live && job ? job.chat : (isAnalyzed ? dChat : []),
       sendChat: async (m) => {
         if (!live || !job) {
           setDChat((c) => [...c, { from: "user", text: m }]);
@@ -273,7 +277,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       eligibility: live && job ? job.eligibility ?? null : null,
       components: live && job ? job.score.components : demoComps,
-      recs: live && job ? job.recommendations : seedRecs,
+      recs: live && job ? job.recommendations : (isAnalyzed ? seedRecs : []),
       jobId: live && job ? job.id : null,
       mode: live && job ? job.mode : "demo",
     };

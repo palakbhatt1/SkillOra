@@ -129,7 +129,7 @@ export default function TailorPage() {
                         {activeCitation?.bulletId === b.id && (
                           <div className="p-2.5 bg-white rounded-lg border border-[#C5E1CB] shadow-sm text-xs space-y-1 mt-1 font-mono">
                             <p className="text-[#1E6B38] font-bold text-[11px]">Verbatim Source Quote:</p>
-                            <p className="text-[#556056] italic">"{activeCitation.span}"</p>
+                            <p className="text-[#556056] italic">"{activeCitation?.span}"</p>
                           </div>
                         )}
                       </div>
@@ -217,15 +217,32 @@ export default function TailorPage() {
               }}
               className="p-3 rounded-xl bg-[#FAF9F5] border border-[#ECE7DD] text-xs sm:text-sm text-[#141A16] leading-relaxed focus:outline-none focus:bg-white"
             >
-              {summary || "Full-stack engineer with hands-on experience developing multi-agent LLM systems and explainable scoring engines."}
+              {summary || "Professional summary will be synthesized automatically once a target job is analyzed in Stage 3."}
             </div>
           </div>
 
-          {/* Experience Section */}
-          {renderSection("Experience & Internships", "role")}
-
-          {/* Projects Section */}
-          {renderSection("Production Projects", "project")}
+          {/* Experience & Projects Sections */}
+          {bullets.length === 0 ? (
+            <div className="py-10 text-center rounded-2xl bg-[#FAF9F5] border-2 border-dashed border-[#D4CFC2] space-y-2.5">
+              <span className="text-3xl">📝</span>
+              <h4 className="text-sm font-serif font-bold text-[#141A16]">No Resume Bullets Generated Yet</h4>
+              <p className="text-xs text-[#556056] max-w-sm mx-auto leading-relaxed">
+                Analyze a target job description in Stage 3 to generate tailored bullets synthesized from your verified ledger facts.
+              </p>
+              <Link
+                href="/job"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#1E6B38] hover:bg-[#16532B] text-white text-xs font-bold rounded-xl shadow-sm transition-all"
+              >
+                <span>Go to Job Match</span>
+                <span>→</span>
+              </Link>
+            </div>
+          ) : (
+            <>
+              {renderSection("Experience & Internships", "role")}
+              {renderSection("Production Projects", "project")}
+            </>
+          )}
 
           {/* Keyword Coach / Recommendations Chips */}
           {keywords && keywords.length > 0 && (
@@ -315,28 +332,38 @@ export default function TailorPage() {
             ref={chatBoxRef}
             className="h-80 overflow-y-auto space-y-3 p-3 rounded-xl bg-[#FAF9F5] border border-[#ECE7DD]"
           >
-            {st.chat.map((msg, idx) => {
-              const isUser = msg.from === "you" || msg.from === "user";
-              return (
-                <div
-                  key={idx}
-                  className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
-                >
-                  <span className="text-[10px] text-[#78827A] mb-0.5">
-                    {isUser ? "You" : "Skillora ADK"}
-                  </span>
+            {st.chat.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 text-[#78827A] space-y-2">
+                <span className="text-2xl">💬</span>
+                <p className="font-semibold text-xs text-[#141A16]">Google ADK Assistant Ready</p>
+                <p className="text-[11px] text-[#556056] max-w-xs leading-relaxed">
+                  Type a instruction or select a quick refinement above to collaboratively tailor and verify your resume.
+                </p>
+              </div>
+            ) : (
+              st.chat.map((msg, idx) => {
+                const isUser = msg.from === "you" || msg.from === "user";
+                return (
                   <div
-                    className={`p-3 rounded-2xl text-xs sm:text-[13px] leading-relaxed max-w-[85%] ${
-                      isUser
-                        ? "bg-[#1E6B38] text-white rounded-br-none"
-                        : "bg-white text-[#141A16] border border-[#ECE7DD] rounded-bl-none shadow-sm"
-                    }`}
+                    key={idx}
+                    className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
                   >
-                    {msg.text}
+                    <span className="text-[10px] text-[#78827A] mb-0.5">
+                      {isUser ? "You" : "Skillora ADK"}
+                    </span>
+                    <div
+                      className={`p-3 rounded-2xl text-xs sm:text-[13px] leading-relaxed max-w-[85%] ${
+                        isUser
+                          ? "bg-[#1E6B38] text-white rounded-br-none"
+                          : "bg-white text-[#141A16] border border-[#ECE7DD] rounded-bl-none shadow-sm"
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
 
           {/* Chat Input */}

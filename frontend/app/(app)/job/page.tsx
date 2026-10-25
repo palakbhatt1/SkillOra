@@ -18,7 +18,7 @@ const samplePresets = [
 
 export default function JobPage() {
   const st = useStore();
-  const [jd, setJd] = useState(st.jd || sampleJd);
+  const [jd, setJd] = useState(st.jd || "");
   const [busy, setBusy] = useState(false);
   const done = st.analyzed;
 

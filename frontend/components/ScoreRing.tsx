@@ -6,7 +6,7 @@ export default function ScoreRing({ value, size = 180 }: { value: number; size?:
   const strokeDashoffset = C * (1 - Math.min(Math.max(value, 0), 100) / 100);
 
   // Dynamic color depending on ATS score
-  const strokeColor = value >= 80 ? "#1E6B38" : value >= 60 ? "#D97706" : "#DC2626";
+  const strokeColor = value === 0 ? "#D4CFC2" : value >= 80 ? "#1E6B38" : value >= 60 ? "#D97706" : "#DC2626";
 
   return (
     <div 

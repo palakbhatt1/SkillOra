@@ -109,7 +109,9 @@ export default function VerifyPage() {
             </div>
 
             <p className="text-xs text-[#78827A]">
-              {pendingCount > 0 ? (
+              {facts.length === 0 ? (
+                <span>Ledger is empty. Ingest experience sources in Stage 1 to extract verified facts.</span>
+              ) : pendingCount > 0 ? (
                 <span>⚠️ {pendingCount} claims await your review before resume tailoring.</span>
               ) : (
                 <span className="text-[#1E6B38] font-semibold">✓ All extracted claims are verified and ready for tailoring.</span>
@@ -179,9 +181,19 @@ export default function VerifyPage() {
       {projectGroups.length === 0 ? (
         <div className="bg-white p-12 text-center rounded-2xl border border-[#ECE7DD] space-y-3">
           <span className="text-3xl">📭</span>
-          <p className="text-sm font-bold text-[#141A16]">No facts found under "{tab}"</p>
-          <Link href="/sources" className="inline-block text-xs font-semibold text-[#1E6B38] hover:underline">
-            + Add more sources in Stage 1
+          <p className="text-sm font-bold text-[#141A16]">
+            {facts.length === 0 ? "Fact ledger is empty" : `No facts found under "${tab}"`}
+          </p>
+          <p className="text-xs text-[#556056] max-w-sm mx-auto">
+            {facts.length === 0
+              ? "Upload resumes, code repositories, or project notes in Stage 1 to extract verifiable claims."
+              : `There are currently no claims marked as "${tab}".`}
+          </p>
+          <Link
+            href="/sources"
+            className="inline-block mt-2 px-4 py-2 bg-[#EAF4EB] hover:bg-[#D5EED8] text-[#1E6B38] border border-[#C5E1CB] text-xs font-bold rounded-xl transition-colors"
+          >
+            + Add Experience Sources in Stage 1
           </Link>
         </div>
       ) : (

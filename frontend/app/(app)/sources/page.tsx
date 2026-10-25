@@ -337,28 +337,38 @@ export default function SourcesPage() {
           </Link>
         </div>
 
-        <div className="divide-y divide-[#F0EDE6]">
-          {list.map((src) => (
-            <div key={src.id} className="py-3 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="w-8 h-8 rounded-lg bg-[#FAF9F5] border border-[#E5E1D5] flex items-center justify-center text-xs font-bold text-[#1E6B38] uppercase shrink-0">
-                  {src.type}
-                </span>
-                <div className="truncate">
-                  <p className="text-xs sm:text-sm font-bold text-[#141A16] truncate">{src.name}</p>
-                  <p className="text-[11px] text-[#78827A] truncate">{src.detail}</p>
+        {list.length === 0 ? (
+          <div className="py-12 text-center space-y-2">
+            <span className="text-3xl">📥</span>
+            <p className="font-bold text-sm text-[#141A16]">No sources added yet</p>
+            <p className="text-xs text-[#556056] max-w-sm mx-auto">
+              Add a GitHub repository, upload a document, or paste project notes above to extract verified facts into your ledger.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-[#F0EDE6]">
+            {list.map((src) => (
+              <div key={src.id} className="py-3 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-8 h-8 rounded-lg bg-[#FAF9F5] border border-[#E5E1D5] flex items-center justify-center text-xs font-bold text-[#1E6B38] uppercase shrink-0">
+                    {src.type}
+                  </span>
+                  <div className="truncate">
+                    <p className="text-xs sm:text-sm font-bold text-[#141A16] truncate">{src.name}</p>
+                    <p className="text-[11px] text-[#78827A] truncate">{src.detail}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs font-semibold text-[#1E6B38] bg-[#EAF4EB] border border-[#C5E1CB] px-2.5 py-0.5 rounded-full">
+                    {src.facts} facts
+                  </span>
+                  <span className="text-[11px] text-[#78827A] hidden sm:inline">{src.updated}</span>
                 </div>
               </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                <span className="text-xs font-semibold text-[#1E6B38] bg-[#EAF4EB] border border-[#C5E1CB] px-2.5 py-0.5 rounded-full">
-                  {src.facts} facts
-                </span>
-                <span className="text-[11px] text-[#78827A] hidden sm:inline">{src.updated}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Security & Prompt Injection Assurance */}
