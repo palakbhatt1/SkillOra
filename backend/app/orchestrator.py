@@ -1,0 +1,310 @@
+"""Single entry point between the app and the agent frameworks.
+
+Every function tries the real agents first (CrewAI / Google ADK + Gemini) and falls back to the
+deterministic rule-based path on any failure, so the app keeps working if Gemini is busy.
+The returned `mode` ("agent" | "rules") is shown in the UI so it is always clear which path ran.
+"""
+import json
+import logging
+
+from . import activity
+
+from .agents.rules import analyze_jd_rules, extract_facts_rules
+from .config import GEMINI_MODELS, MAX_FACTS_GITHUB, MAX_FACTS_PER_SOURCE, USE_LLM
+from .agents.structure import enrich
+from .parsers import sha
+from .engine.matching import match_all
+from .engine.verify import verify_bullet
+from .vocab import find_skills, pretty
+
+log = logging.getLogger("skillora")
+
+
+def _cache_get(key: str):
+    from .db import LLMCache, SessionLocal
+
+    with SessionLocal() as db:
+        row = db.get(LLMCache, key)
+        return row.value if row else None
+
+
+def _cache_put(key: str, value) -> None:
+    from .db import LLMCache, SessionLocal
+
+    try:
+        with SessionLocal() as db:
+            db.merge(LLMCache(key=key, value=value))
+            db.commit()
+    except Exception as e:  # noqa: BLE001 - cache is best-effort
+        log.warning("cache write failed: %s", e)
+
+
+# ------------------------------------------------------------------ Phase 1
+def extract_facts(text: str, name: str, stype: str = "note", uid: int | None = None) -> tuple[list[dict], str]:
+    """Agent (or rules) extracts bullet facts; structure.enrich adds one fact per skill, each project's tech-stack
+    line, and a project|role|education label from the section header."""
+    limit = MAX_FACTS_GITHUB if stype == "github" else MAX_FACTS_PER_SOURCE
+    facts, mode = _extract_bullets(text, name, limit, uid)
+    if stype != "github":
+        with activity.step(uid, "Structure parser", "Python · section headers") as s:
+            facts = enrich(facts, text, limit)
+            s["note"] = f"{len(facts)} facts incl. one per skill + each project's tech stack"
+    return facts, mode
+
+
+def _extract_bullets(text: str, name: str, limit: int, uid: int | None = None) -> tuple[list[dict], str]:
+    if USE_LLM:
+        try:
+            key = sha(f"extract2|{limit}|{name}|{text}")
+            hit = _cache_get(key)
+            if hit:
+                activity.event(uid, "Source Extractor", "CrewAI · cache hit", note="this exact file was read before")
+                return hit, "agent"
+            from .agents.crew_flows import run_ingest
+
+            facts = run_ingest(text, name, limit, uid)
+            if facts:
+                _cache_put(key, facts)
+                return facts, "agent"
+            log.warning("Source Extractor returned no valid facts; using rules")
+        except Exception as e:  # noqa: BLE001
+            log.warning("Source Extractor failed (%s); using rules", e)
+    with activity.step(uid, "Source Extractor", "Python rules (Gemini unavailable)"):
+        return extract_facts_rules(text, name, limit), "rules"
+
+
+# ------------------------------------------------------------------ Phase 2
+def analyze_and_match(jd: str, facts: list[dict], uid: int | None = None) -> tuple[dict, list[dict], str]:
+    if USE_LLM:
+        try:
+            from .agents.crew_flows import run_job_analysis
+
+            key = sha("jd|" + jd.strip())
+            analysis, matches = run_job_analysis(jd, facts, _cache_get(key), uid)
+            if analysis.get("requirements"):
+                _cache_put(key, analysis)
+                return analysis, matches, "agent"
+        except Exception as e:  # noqa: BLE001
+            log.warning("JD Analyzer/Matcher flow failed (%s); using rules", e)
+    with activity.step(uid, "JD Analyzer", "Python rules (Gemini unavailable)"):
+        analysis = analyze_jd_rules(jd)
+        return analysis, match_all(analysis["requirements"], facts), "rules"
+
+
+def _template_summary(analysis: dict, pool: list[dict]) -> str:
+    have = find_skills(" ".join(f["text"] for f in pool))
+    top = [s for s in analysis["keywords"] if s in have][:4] or sorted(have)[:4]
+    role = analysis["title"] if analysis["title"] != "Role" else "software"
+    top = [pretty(t) for t in top]
+    sk = ", ".join(top[:-1]) + (" and " if len(top) > 1 else "") + top[-1] if top else "software development"
+    return f"Early-career {role.lower()} with hands-on project experience in {sk}."
+
+
+def write_resume_text(analysis: dict, targets: list[dict], pool: list[dict], use_llm: bool = True, uid: int | None = None) -> dict:
+    """Writer<->Verifier loop. Returns {summary, bullets: {fid: (text, attempts, mode)}}."""
+    by_id = {f["id"]: f for f in pool}
+    out = {fid: (f["text"], 1, "fact") for fid, f in ((t["id"], t) for t in targets)}
+    ids_of = {t["id"]: t.get("ids", [t["id"]]) for t in targets}
+    summary = None
+    if use_llm and USE_LLM and targets:
+        try:
+            from .agents.adk_agents import write_with_verifier
+
+            key = sha("write2|" + json.dumps([analysis["title"], analysis["keywords"], [(t["id"], t.get("ids"), t["text"]) for t in targets], [(p["id"], p["text"]) for p in pool]], sort_keys=True))
+            cached = _cache_get(key)
+            if cached:
+                draft, attempts = cached["draft"], cached["attempts"]
+                activity.event(uid, "Resume Writer", "Google ADK · cache hit", note="identical facts + job seen before; Verifier re-checked every bullet")
+            else:
+                draft, attempts = write_with_verifier(analysis, targets, pool, uid)
+                _cache_put(key, {"draft": draft, "attempts": attempts})
+            for b in draft.get("bullets", []):
+                fid, text = b.get("fact"), str(b.get("text", "")).strip()
+                if fid in out and text and verify_bullet(text, ids_of[fid], by_id)["ok"]:
+                    out[fid] = (text, attempts.get(fid, 1), "agent")
+                elif fid in out:
+                    out[fid] = (out[fid][0], attempts.get(fid, 1) + 1, "fact")  # revision failed -> grounded original
+            s = str(draft.get("summary") or "").strip()
+            if s and verify_bullet(s, [f["id"] for f in pool], by_id)["ok"]:
+                summary = s
+        except Exception as e:  # noqa: BLE001
+            log.warning("ADK Writer/Verifier failed (%s); using grounded facts", e)
+    return {"summary": summary or _template_summary(analysis, pool), "bullets": out}
+
+
+# ------------------------------------------------------------------ chat (ADK Coordinator)
+def make_tools(job_id: int):
+    """Tools for the Coordinator. Each opens its own DB session; imports are lazy to avoid cycles."""
+    from google.adk.tools import ToolContext  # noqa: F401  (type hint used by ADK to inject context)
+
+    def explain_score() -> dict:
+        """Explain the job-fit score: the five components and the top fixes."""
+        from . import service
+        from .db import Job, SessionLocal
+
+        with SessionLocal() as db:
+            v = service.job_view(db, db.get(Job, job_id))
+        return {"total": v["score"]["total"], "components": [{c["key"]: c["value"], "why": c["why"]} for c in v["score"]["components"]],
+                "top_fixes": [r["title"] for r in v["recommendations"][:3]]}
+
+    def list_gaps() -> dict:
+        """List the requirements that no verified fact supports."""
+        from . import service
+        from .db import Job, SessionLocal
+
+        with SessionLocal() as db:
+            v = service.job_view(db, db.get(Job, job_id))
+        return {"missing": [r["text"] for r in v["requirements"] if r["match"] == "missing"], "partial": [r["text"] for r in v["requirements"] if r["match"] == "partial"]}
+
+    def set_project_included(project_name: str, included: bool) -> dict:
+        """Include or exclude a project from the resume (matches by name, case-insensitive substring)."""
+        from . import service
+        from .db import Job, SessionLocal
+
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            hit = [p for p in job.data["projects"] if project_name.lower() in p["name"].lower()]
+            if not hit:
+                return {"ok": False, "error": f"No project matching '{project_name}'.", "projects": [p["name"] for p in job.data["projects"]]}
+            d = dict(job.data)
+            for p in d["projects"]:
+                if p in hit:
+                    p["picked"] = included
+                    p["manual"] = True
+            job.data = d
+            service.refresh_job(db, job, rewrite=True, use_llm=USE_LLM)
+        return {"ok": True, "project": hit[0]["name"], "included": included}
+
+    # ---- direct resume editing on the user's instruction. Edits are marked user=True ("your wording"):
+    #      they are not source-checked, but they ARE exported, because the user is the author.
+    def _edit(fn) -> dict:
+        from .db import Job, SessionLocal
+
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            d = dict(job.data)
+            before = json.loads(json.dumps(d["resume"]))
+            r = json.loads(json.dumps(d["resume"]))
+            out = fn(r)
+            if not out.get("ok", True):
+                return out
+            d["history"] = (list(d.get("history", [])) + [before])[-10:]
+            d["resume"] = r
+            job.data = d
+            db.commit()
+            return {"ok": True, **out}
+
+    def get_resume() -> dict:
+        """Read the current resume: summary, skills and every bullet with its id and section."""
+        from .db import Job, SessionLocal
+
+        with SessionLocal() as db:
+            r = db.get(Job, job_id).data["resume"]
+        return {"summary": r.get("summary", ""), "skills": r.get("skills", []),
+                "bullets": [{"id": b["id"], "section": b["project"], "text": b["text"]} for b in r.get("bullets", [])]}
+
+    def set_summary(text: str) -> dict:
+        """Replace the professional summary with exactly this text."""
+        def fn(r):
+            r["summary"], r["summary_user"] = text.strip(), True
+            return {"summary": r["summary"]}
+        return _edit(fn)
+
+    def set_bullet(bullet_id: str, text: str) -> dict:
+        """Replace the text of one bullet (use the id from get_resume)."""
+        def fn(r):
+            for x in r["bullets"]:
+                if x["id"].lower() == bullet_id.lower():
+                    x["text"], x["user"] = text.strip(), True
+                    return {"bullet": x["id"], "text": x["text"]}
+            return {"ok": False, "error": f"No bullet {bullet_id}. Call get_resume to see the ids."}
+        return _edit(fn)
+
+    def add_bullet(section: str, text: str) -> dict:
+        """Add a new bullet under a project or job name (section). Creates the section if it does not exist."""
+        def fn(r):
+            same = [x for x in r["bullets"] if x["project"].lower() == section.lower()]
+            n = 1 + max([int(x["id"][1:]) for x in r["bullets"] if x["id"][:1] == "U" and x["id"][1:].isdigit()] or [0])
+            r["bullets"].append({"id": f"U{n}", "project": same[0]["project"] if same else section.strip(), "kind": same[0].get("kind", "project") if same else "project",
+                                 "text": text.strip(), "facts": [], "verified": False, "user": True})
+            return {"bullet": f"U{n}"}
+        return _edit(fn)
+
+    def delete_bullet(bullet_id: str) -> dict:
+        """Remove one bullet from the resume."""
+        def fn(r):
+            keep = [x for x in r["bullets"] if x["id"].lower() != bullet_id.lower()]
+            if len(keep) == len(r["bullets"]):
+                return {"ok": False, "error": f"No bullet {bullet_id}."}
+            r["bullets"] = keep
+            return {"deleted": bullet_id}
+        return _edit(fn)
+
+    def set_skills(skills: list[str]) -> dict:
+        """Replace the Skills section with exactly this list."""
+        def fn(r):
+            r["skills"] = [x.strip() for x in skills if x.strip()]
+            return {"skills": r["skills"]}
+        return _edit(fn)
+
+    def undo_last_edit() -> dict:
+        """Undo the most recent change to the resume (summary, bullets or skills)."""
+        from .db import Job, SessionLocal
+
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            d = dict(job.data)
+            hist = list(d.get("history", []))
+            if not hist:
+                return {"ok": False, "error": "Nothing to undo."}
+            d["resume"] = hist.pop()
+            d["history"] = hist
+            job.data = d
+            db.commit()
+        return {"ok": True, "undone": True, "left": len(hist)}
+
+    return [explain_score, list_gaps, set_project_included, get_resume, set_summary, set_bullet, add_bullet, delete_bullet, set_skills, undo_last_edit]
+
+
+def chat(job_id: int, message: str, uid: int | None = None) -> tuple[str, str]:
+    """Coordinator. Common requests take a fast path that calls the same tools directly (milliseconds);
+    open-ended questions go to the ADK Coordinator agent (2 Gemini calls when it uses a tool)."""
+    fast = _fast_intent(job_id, message)
+    if fast is not None:
+        activity.event(uid, "Coordinator", "Python tools · fast path", note="answered directly by the score / gap / project tools")
+        return fast, "fast"
+    if USE_LLM:
+        try:
+            from .agents.adk_agents import chat as adk_chat
+
+            with activity.step(uid, "Coordinator", f"Google ADK · {GEMINI_MODELS[0]}"):
+                return adk_chat(f"chat-{job_id}", message, make_tools(job_id), {"job_id": job_id}), "agent"
+        except Exception as e:  # noqa: BLE001
+            log.warning("Coordinator failed (%s)", e)
+    return "I can explain your score, list gaps, rewrite the summary, or include/exclude a project.", "rules"
+
+
+def _fast_intent(job_id: int, message: str) -> str | None:
+    """Only unambiguous requests skip the LLM. Anything that asks to change the resume goes to the Coordinator,
+    which edits through real tools, so it can never claim an edit it did not make."""
+    import re
+
+    tools = {t.__name__: t for t in make_tools(job_id)}
+    m = message.lower().strip()
+    if re.fullmatch(r"(please\s+)?(undo|revert)( (it|that|the last (edit|change)|last (edit|change)))?[.!]?", m):
+        r = tools["undo_last_edit"]()
+        return f"Undone. {r['left']} earlier change(s) can still be undone." if r["ok"] else r["error"]
+    if re.search(r"\b(change|rewrite|edit|make|add|remove|delete|replace|shorten|expand|longer|shorter|write|put|update|improve)\b", m):
+        mm = re.search(r"\b(remove|exclude|drop|add|include)\b\s+(?:the\s+)?(.+?)\s+project\s*$", m)
+        if mm:
+            r = tools["set_project_included"](mm.group(2), mm.group(1) in ("add", "include"))
+            if r["ok"]:
+                return f"{'Included' if r['included'] else 'Removed'} {r['project']} and rewrote the bullets."
+        return None
+    if re.search(r"\bscore\b", m):
+        r = tools["explain_score"]()
+        return f"Your job-fit score is {r['total']}/100. Top fixes: " + ("; ".join(r["top_fixes"]) or "none") + "."
+    if re.search(r"\b(gap|gaps|missing)\b", m):
+        r = tools["list_gaps"]()
+        return "Missing from your sources: " + (", ".join(r["missing"]) or "nothing") + ". You can still ask me to add them in your own wording."
+    return None

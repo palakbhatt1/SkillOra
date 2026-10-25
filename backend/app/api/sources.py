@@ -1,124 +1,113 @@
-import hashlib
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
-from typing import List, Optional
 from sqlalchemy.orm import Session
 
-from app.db.database import get_db
-from app.db.models import Project, Source
-from app.parsers.pdf import PDFParser
-from app.parsers.docx import DocxParser
-from app.parsers.pptx import PptxParser
-from app.parsers.notes import NotesParser
+from app import activity, service
+from app.api.deps import current_user
+from app.db import Source, User, get_db
+from app.parsers import (
+    extract_github_links,
+    fetch_github,
+    list_user_repos,
+    parse_bytes,
+    parse_code_folder,
+)
 
-router = APIRouter()
+router = APIRouter(prefix="/api", tags=["sources"])
 
-class SourceCreateRequest(BaseModel):
-    type: str  # 'github', 'notes'
-    url_or_name: str
-    raw_text: Optional[str] = None
 
-class SourceResponse(BaseModel):
-    id: int
-    project_id: int
-    type: str
-    url_or_name: str
-    content_hash: Optional[str] = None
+class GithubIn(BaseModel):
+    repo: str
 
-    class Config:
-        from_attributes = True
 
-@router.get("/{project_id}/sources", response_model=List[SourceResponse])
-def list_sources(project_id: int, db: Session = Depends(get_db)):
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return db.query(Source).filter(Source.project_id == project_id).all()
+class NoteIn(BaseModel):
+    name: str = "Note"
+    text: str
 
-@router.post("/{project_id}/sources", response_model=SourceResponse)
-def add_source(project_id: int, payload: SourceCreateRequest, db: Session = Depends(get_db)):
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        # Auto-create project if it doesn't exist
-        project = Project(id=project_id, title=payload.url_or_name, summary="Auto-created project")
-        db.add(project)
-        db.commit()
 
-    content = payload.raw_text or payload.url_or_name
-    content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+class FolderIn(BaseModel):
+    folder_path: str
 
-    # Check if this source already exists for the project
-    existing = db.query(Source).filter(
-        Source.project_id == project_id,
-        Source.url_or_name == payload.url_or_name
-    ).first()
 
-    if existing:
-        existing.raw_text = payload.raw_text
-        existing.type = payload.type
-        db.commit()
-        db.refresh(existing)
-        return existing
+def _ingested(db: Session, src: Source, info: dict):
+    return {"source": service.source_view(src), **info}
 
-    new_source = Source(
-        project_id=project_id,
-        type=payload.type,
-        url_or_name=payload.url_or_name,
-        raw_text=payload.raw_text,
-        content_hash=content_hash
-    )
-    db.add(new_source)
-    db.commit()
-    db.refresh(new_source)
-    return new_source
 
-@router.post("/{project_id}/sources/upload", response_model=SourceResponse)
-async def upload_source_file(
-    project_id: int,
+@router.get("/sources")
+def list_sources(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    return [service.source_view(s) for s in db.query(Source).filter(Source.user_id == user.id).order_by(Source.updated.desc()).all()]
+
+
+@router.post("/sources/github")
+def add_github(b: GithubIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    with activity.step(user.id, "GitHub reader", "GitHub REST API · README + manifests") as s:
+        name, text, detail = fetch_github(b.repo)
+        s["note"] = name
+    src, info = service.ingest_text(db, user.id, name=name, stype="github", text=text, uri=b.repo, detail=detail)
+    return _ingested(db, src, info)
+
+
+@router.post("/sources/upload")
+async def upload(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    source_id: int | None = Form(None),
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        project = Project(id=project_id, title=file.filename, summary="Project created from upload")
-        db.add(project)
+    data = await file.read()
+    with activity.step(user.id, "Document parser", "pdfplumber · python-docx · python-pptx · zip") as s:
+        stype, text, urls = parse_bytes(file.filename or "upload.txt", data)
+        s["note"] = f"{file.filename} · {len(text):,} characters"
+    detail = f"{stype.upper()} · {len(data) // 1024} KB"
+    name = file.filename or "upload"
+    if source_id:
+        old = db.get(Source, source_id)
+        if old and old.user_id == user.id and old.type != "github":
+            name, stype = old.name, old.type
+    src, info = service.ingest_text(db, user.id, name=name, stype=stype, text=text, detail=detail)
+    info["github"] = extract_github_links(text, urls)
+    if not user.links and info["github"]["profiles"]:
+        user.links = "github.com/" + info["github"]["profiles"][0]
+        db.add(user)
         db.commit()
+    return _ingested(db, src, info)
 
-    file_bytes = await file.read()
-    filename = file.filename or "upload.bin"
-    ext = filename.lower().split(".")[-1]
 
-    extracted_text = ""
-    source_type = "notes"
+@router.post("/sources/folder")
+def add_code_folder(b: FolderIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    with activity.step(user.id, "Code folder parser", "Local repository inspector") as s:
+        name, text, detail = parse_code_folder(b.folder_path)
+        s["note"] = name
+    src, info = service.ingest_text(db, user.id, name=name, stype="code", text=text, uri=b.folder_path, detail=detail)
+    return _ingested(db, src, info)
 
-    if ext == "pdf":
-        source_type = "pdf"
-        chunks = PDFParser.parse(file_bytes, filename)
-        extracted_text = "\n\n".join([c["content"] for c in chunks])
-    elif ext in ("docx", "doc"):
-        source_type = "docx"
-        chunks = DocxParser.parse(file_bytes, filename)
-        extracted_text = "\n\n".join([c["content"] for c in chunks])
-    elif ext in ("pptx", "ppt"):
-        source_type = "pptx"
-        chunks = PptxParser.parse(file_bytes, filename)
-        extracted_text = "\n\n".join([c["content"] for c in chunks])
-    else:
-        try:
-            extracted_text = file_bytes.decode("utf-8", errors="ignore")
-        except Exception:
-            extracted_text = ""
 
-    content_hash = hashlib.sha256(file_bytes).hexdigest()
+@router.get("/github/repos")
+def github_repos(user_name: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    have = {s.name.lower() for s in db.query(Source).filter(Source.user_id == user.id, Source.type == "github").all()}
+    return [{**r, "added": r["repo"].lower() in have} for r in list_user_repos(user_name.strip())]
 
-    new_source = Source(
-        project_id=project_id,
-        type=source_type,
-        url_or_name=filename,
-        raw_text=extracted_text,
-        content_hash=content_hash
-    )
-    db.add(new_source)
-    db.commit()
-    db.refresh(new_source)
-    return new_source
+
+@router.post("/sources/note")
+def add_note(b: NoteIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    src, info = service.ingest_text(db, user.id, name=b.name, stype="note", text=b.text, detail="Free-text note")
+    return _ingested(db, src, info)
+
+
+@router.post("/sources/{sid}/resync")
+def resync(sid: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    s = db.get(Source, sid)
+    if not s or s.user_id != user.id or s.type != "github":
+        raise HTTPException(400, "Only GitHub sources can be re-synced from here; re-upload the file instead.")
+    name, text, detail = fetch_github(s.uri or s.name)
+    src, info = service.ingest_text(db, user.id, name=name, stype="github", text=text, uri=s.uri, detail=detail)
+    return _ingested(db, src, info)
+
+
+@router.delete("/sources/{sid}")
+def delete_source(sid: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    s = db.get(Source, sid)
+    if s and s.user_id == user.id:
+        db.delete(s)
+        db.commit()
+    return {"ok": True}

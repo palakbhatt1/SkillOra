@@ -1,0 +1,290 @@
+"use client";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  chatSeed, initialBullets, initialFacts, initialKeywords, projects as seedProjects, recommendations as seedRecs, requirements as seedReqs,
+  resumeSummary, scoreComponents, sources as seedSources, jobMeta,
+  type Fact, type FactStatus, type Source,
+} from "./data";
+import { useRouter } from "next/navigation";
+import { api, clearToken, getToken, type Eligibility, type ScoringProfile, type ApiBullet, type ApiKeyword, type ApiProject, type JobView, type Profile, type Recommendation, type ScoreComponent } from "./api";
+
+/**
+ * One store for every screen. When the FastAPI backend is reachable (`live`) all data comes from it
+ * (CrewAI + Google ADK agents behind the API). If it is not, the same screens run on the bundled demo
+ * dataset so a presentation never breaks.
+ */
+interface Store {
+  live: boolean;
+  ready: boolean;
+  busy: string; // label of the long-running agent step, "" when idle
+  error: string;
+  notice: string;
+  llm: boolean;
+  profile: Profile;
+  saveProfile: (p: Profile) => Promise<void>;
+  logout: () => void;
+
+  sources: Source[];
+  addGithub: (repo: string) => Promise<string>;
+  addNote: (name: string, text: string) => Promise<string>;
+  upload: (f: File) => Promise<string>;
+  removeSource: (id: string) => Promise<void>;
+  resync: (id: string) => Promise<string>;
+  reupload: (id: string, f: File) => Promise<string>;
+  found: { profiles: string[]; repos: string[] };
+  clearFound: () => void;
+
+  facts: Fact[];
+  setFactStatus: (id: string, s: FactStatus) => Promise<void>;
+  editFact: (id: string, text: string) => Promise<void>;
+  declareSkill: (skill: string) => Promise<void>;
+  confirmGroup: (project: string | null) => Promise<void>;
+  rejectGroup: (project: string) => Promise<void>;
+
+  analyzed: boolean;
+  jd: string;
+  analyze: (jd: string) => Promise<void>;
+  meta: { title: string; company: string; seniority: string; keywords: string[] };
+  requirements: JobView["requirements"];
+  projects: ApiProject[];
+  toggleProject: (id: string) => Promise<void>;
+  summary: string;
+  bullets: ApiBullet[];
+  skills: string[];
+  setBullets: (b: ApiBullet[]) => void;
+  editBullet: (id: string, text: string) => Promise<void>;
+  editSummary: (text: string) => Promise<void>;
+  regenerate: () => Promise<void>;
+  undo: () => Promise<void>;
+  keywords: ApiKeyword[];
+  decideKeyword: (id: string, accept: boolean) => Promise<void>;
+  chat: { from: string; text: string }[];
+  sendChat: (m: string) => Promise<void>;
+  score: number;
+  scoreProfile: ScoringProfile | null;
+  profiles: ScoringProfile[];
+  setScoreProfile: (id: string) => Promise<void>;
+  eligibility: Eligibility | null;
+  components: ScoreComponent[];
+  recs: Recommendation[];
+  jobId: number | null;
+  mode: "agent" | "rules" | "demo";
+}
+
+const Ctx = createContext<Store | null>(null);
+const demoProfile: Profile = { name: "Aarav Mehta", email: "aarav@email.com", links: "github.com/aarav", location: "Bengaluru" };
+
+export function StoreProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const [live, setLive] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [llm, setLlm] = useState(false);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [profile, setProfile] = useState<Profile>(demoProfile);
+  const [sources, setSources] = useState<Source[]>(seedSources);
+  const [facts, setFacts] = useState<Fact[]>(initialFacts);
+  const [job, setJob] = useState<JobView | null>(null);
+  const [jd, setJd] = useState("");
+  const [found, setFound] = useState<{ profiles: string[]; repos: string[] }>({ profiles: [], repos: [] });
+
+  // demo-mode local state
+  const [dBullets, setDBullets] = useState<ApiBullet[]>(initialBullets);
+  const [dKeywords, setDKeywords] = useState<ApiKeyword[]>(initialKeywords);
+  const [dProjects, setDProjects] = useState<ApiProject[]>(seedProjects);
+  const [dChat, setDChat] = useState(chatSeed);
+  const [dAnalyzed, setDAnalyzed] = useState(false);
+  const [dSummary, setDSummary] = useState(resumeSummary);
+
+  const refreshLedger = useCallback(async () => {
+    const [s, f] = await Promise.all([api.sources(), api.facts()]);
+    setSources(s);
+    setFacts(f);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const h = await api.health();
+        if (!getToken()) { router.replace("/login"); return; }  // backend is up: an account is required
+        setLive(true);
+        setLlm(h.llm);
+        const [, p, j] = await Promise.all([refreshLedger(), api.profile(), api.latestJob()]);
+        setProfile(p);
+        if (j) { setJob(j); setJd(j.jd); }
+      } catch {
+        setLive(false);  // backend offline (or token rejected -> api.ts already redirected): demo data
+      }
+      setReady(true);
+    })();
+  }, [refreshLedger, router]);
+
+  /** Run an API action with a busy label and uniform error handling. */
+  const run = useCallback(async <T,>(label: string, fn: () => Promise<T>): Promise<T | undefined> => {
+    setBusy(label);
+    setError("");
+    try { return await fn(); }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(""); }
+  }, []);
+
+  const flash = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 6000); };
+
+  const reloadJob = useCallback(async (j?: JobView | null) => {
+    if (j) setJob(j);
+    else if (job) setJob(await api.latestJob());
+  }, [job]);
+
+  const value = useMemo<Store>(() => {
+    // ----- demo-mode derived values (same logic as the original static demo)
+    const verified = facts.filter((f) => f.status === "verified").length;
+    const accepted = dKeywords.filter((k) => k.state === "accepted").length;
+    const boost = Math.max(0, Math.min(verified - 5, 5)) + accepted * 2;
+    const demoScore = Math.max(60, Math.min(98, 74 + boost));
+    const demoComps = scoreComponents.map((c, i) => ({ ...c, value: Math.min(99, c.value + (i === 3 || i === 0 ? boost : Math.round(boost / 2))) }));
+
+    const ingestMsg = (r: { added: number; stale: number; mode: string; warnings: string[]; unchanged: boolean }) =>
+      r.unchanged ? "No change since last time - nothing re-extracted." :
+      `Extracted ${r.added} new fact${r.added === 1 ? "" : "s"} (${r.mode === "agent" ? "CrewAI agent" : "rule-based fallback"})` +
+      (r.stale ? `, ${r.stale} marked stale` : "") + (r.warnings.length ? ` - note: ${r.warnings.join(", ")}` : "") + ". Review them on Verify Facts.";
+
+    return {
+      live, ready, busy, error, notice, llm, profile,
+      logout: () => { clearToken(); router.replace("/login"); },
+      saveProfile: async (p) => { setProfile(p); if (live) await run("Saving", () => api.saveProfile(p)); },
+
+      sources,
+      addGithub: async (repo) => { const r = await run("Source Extractor agent is reading the repo", () => api.addGithub(repo)); if (!r) return ""; await refreshLedger(); const m = ingestMsg(r); flash(m); return m; },
+      addNote: async (name, text) => { const r = await run("Source Extractor agent is reading the note", () => api.addNote(name, text)); if (!r) return ""; await refreshLedger(); const m = ingestMsg(r); flash(m); return m; },
+      upload: async (f) => { const r = await run("Parsing file and extracting facts", () => api.upload(f)); if (!r) return ""; setFound(r.github ?? { profiles: [], repos: [] }); await refreshLedger(); if (r.github?.profiles.length) api.profile().then(setProfile).catch(() => {}); const m = ingestMsg(r); flash(m); return m; },
+      resync: async (id) => { const r = await run("Re-reading the repo from GitHub", () => api.resync(id)); if (!r) return ""; await refreshLedger(); if (job) setJob(await api.latestJob()); const m = ingestMsg(r); flash(m); return m; },
+      reupload: async (id, f) => { const r = await run("Re-reading the updated file", () => api.upload(f, id)); if (!r) return ""; await refreshLedger(); if (job) setJob(await api.latestJob()); const m = ingestMsg(r); flash(m); return m; },
+      removeSource: async (id) => {
+        if (!live) return;
+        await run("Deleting source and its facts", async () => {
+          await api.removeSource(id);
+          await refreshLedger();
+          if (job) setJob(await api.latestJob());
+        });
+        flash("Source deleted along with the facts extracted from it.");
+      },
+      found,
+      clearFound: () => setFound({ profiles: [], repos: [] }),
+
+      facts,
+      setFactStatus: async (id, s) => {
+        if (!live) return setFacts((fs) => fs.map((f) => (f.id === id ? { ...f, status: s } : f)));
+        const f = await run("Saving", () => api.setFact(id, s));
+        if (f) { setFacts((fs) => fs.map((x) => (x.id === id ? { ...x, ...f } : x))); if (job) setJob(await api.latestJob()); }
+      },
+      editFact: async (id, text) => {
+        if (!live) return setFacts((fs) => fs.map((f) => (f.id === id ? { ...f, text, status: "verified" } : f)));
+        const f = await run("Saving", () => api.editFact(id, text));
+        if (f) { setFacts((fs) => fs.map((x) => (x.id === id ? { ...x, ...f } : x))); if (job) setJob(await api.latestJob()); }
+      },
+      confirmGroup: async (project) => {
+        if (!live) return setFacts((fs) => fs.map((f) => ((project === null || f.project === project) && f.status === "pending" ? { ...f, status: "verified" } : f)));
+        const r = await run("Confirming", () => api.bulk(project, "verified", "pending"));
+        if (r) { await refreshLedger(); if (job) setJob(await api.latestJob()); flash(`Confirmed ${r.updated} facts.`); }
+      },
+      rejectGroup: async (project) => {
+        if (!live) return setFacts((fs) => fs.map((f) => (f.project === project && f.status !== "rejected" ? { ...f, status: "rejected" } : f)));
+        const r = await run("Rejecting", () => api.bulk(project, "rejected", "all"));
+        if (r) { await refreshLedger(); if (job) setJob(await api.latestJob()); flash(`Rejected ${r.updated} facts.`); }
+      },
+      declareSkill: async (skill) => {
+        if (!live) return;
+        await run("Saving", async () => { await api.declare(skill); await refreshLedger(); setJob(await api.latestJob()); });
+        flash(`${skill} added as a self-declared skill (no source proof, lower score weight).`);
+      },
+
+      analyzed: live ? !!job : dAnalyzed,
+      jd,
+      analyze: async (text) => {
+        setJd(text);
+        if (!live) { setDAnalyzed(true); return; }
+        const j = await run("CrewAI flow: JD Analyzer then Matcher, then ADK Writer and Verifier", () => api.analyze(text));
+        if (j) setJob(j);
+      },
+      meta: live && job ? job.meta : jobMeta,
+      requirements: live && job ? job.requirements : seedReqs,
+      projects: live && job ? job.projects : dProjects,
+      toggleProject: async (id) => {
+        if (!live || !job) return setDProjects((ps) => ps.map((p) => (p.id === id ? { ...p, picked: !p.picked } : p)));
+        const j = await run("Resume Writer + Verifier are rewriting the bullets for your new selection", () => api.toggleProject(job.id, id));
+        if (j) setJob(j);
+      },
+      summary: live && job ? job.resume.summary : dSummary,
+      bullets: live && job ? job.resume.bullets : dBullets,
+      skills: live && job ? job.resume.skills : [],
+      setBullets: (b) => { if (!live) setDBullets(b); },
+      editBullet: async (id, text) => {
+        if (!live || !job) return setDBullets((bs) => bs.map((b) => (b.id === id ? { ...b, text } : b)));
+        const j = await api.editBullet(job.id, id, text).catch((e) => { setError(String(e.message ?? e)); return null; });
+        if (j) setJob(j);
+      },
+      editSummary: async (text) => {
+        if (!live || !job) return setDSummary(text);
+        const j = await api.editSummary(job.id, text).catch(() => null);
+        if (j) setJob(j);
+      },
+      undo: async () => {
+        if (!live || !job) return;
+        const j = await run("Undoing the last change", () => api.undo(job.id));
+        if (j) { setJob(j); flash("Last change undone."); }
+      },
+      regenerate: async () => {
+        if (!live || !job) return;
+        const j = await run("ADK Resume Writer and Verifier loop", () => api.regenerate(job.id));
+        if (j) setJob(j);
+      },
+      keywords: live && job ? job.keywords : dKeywords,
+      decideKeyword: async (id, accept) => {
+        if (!live || !job) {
+          setDKeywords((ks) => ks.map((k) => (k.id === id ? { ...k, state: accept ? "accepted" : "rejected" } : k)));
+          if (accept) {
+            const k = dKeywords.find((x) => x.id === id);
+            if (k?.rewrite && k.fact && !dBullets.some((b) => b.id === "K-" + id)) setDBullets([...dBullets, { id: "K-" + id, project: "SkillOra", text: k.rewrite, facts: [k.fact], verified: true }]);
+          }
+          return;
+        }
+        const j = await run("Saving", () => api.decideKeyword(job.id, id, accept));
+        if (j) setJob(j);
+      },
+      chat: live && job ? job.chat : dChat,
+      sendChat: async (m) => {
+        if (!live || !job) {
+          setDChat((c) => [...c, { from: "user", text: m }]);
+          setTimeout(() => setDChat((c) => [...c, { from: "agent", text: /docker|kube/i.test(m) ? "I can't add that - no verified fact supports it." : "Done - updated and re-verified." }]), 700);
+          return;
+        }
+        setJob({ ...job, chat: [...job.chat, { from: "user", text: m }] });
+        const r = await run("ADK Coordinator is thinking", () => api.chat(job.id, m));
+        if (r) setJob(r.job);
+      },
+      score: live ? (job ? job.score.total : 0) : demoScore,
+      scoreProfile: live && job ? job.profile ?? null : null,
+      profiles: live && job ? job.profiles ?? [] : [],
+      setScoreProfile: async (id) => {
+        if (!live || !job) return;
+        const j = await run("Re-scoring with the new profile", () => api.setScoreProfile(job.id, id));
+        if (j) setJob(j);
+      },
+      eligibility: live && job ? job.eligibility ?? null : null,
+      components: live && job ? job.score.components : demoComps,
+      recs: live && job ? job.recommendations : seedRecs,
+      jobId: live && job ? job.id : null,
+      mode: live && job ? job.mode : "demo",
+    };
+  }, [live, ready, busy, error, notice, llm, profile, router, found, sources, facts, job, jd, dBullets, dKeywords, dProjects, dChat, dAnalyzed, dSummary, run, refreshLedger]);
+
+  void reloadJob;
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+export function useStore() {
+  const c = useContext(Ctx);
+  if (!c) throw new Error("StoreProvider missing");
+  return c;
+}
