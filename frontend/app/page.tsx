@@ -5,11 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 
 export default function Home() {
-  const [showContact, setShowContact] = useState(false);
-  const [contactSent, setContactSent] = useState(false);
-  const [contactName, setContactName] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  const [contactMsg, setContactMsg] = useState("");
+  const [showPricing, setShowPricing] = useState(false);
+  const [showResources, setShowResources] = useState(false);
   return (
     <div className="h-screen w-screen max-h-screen overflow-hidden bg-[#FAF9F5] text-[#141A16] relative flex flex-col justify-between selection:bg-[#DCFCE7] selection:text-[#166534]">
       
@@ -36,20 +33,39 @@ export default function Home() {
           </span>
         </Link>
 
-        {/* Center Nav Links */}
-        <nav className="hidden md:flex items-center gap-8 text-xs font-semibold text-[#465048]">
-          <Link href="/" className="hover:text-[#1E6B38] transition-colors">
+        {/* Center Nav Links: Home, How It Works, Pricing, Resources */}
+        <nav 
+          className="hidden md:flex items-center text-xs font-semibold text-[#465048]"
+          style={{ display: "flex", alignItems: "center", gap: "24px" }}
+        >
+          <Link 
+            href="/" 
+            className="px-3.5 py-1.5 rounded-xl hover:text-[#1E6B38] hover:bg-[#EAF4EB] transition-all"
+            style={{ marginRight: "6px" }}
+          >
             Home
           </Link>
-          <Link href="/how-it-works" className="hover:text-[#1E6B38] transition-colors">
-            About
+          <Link 
+            href="/how-it-works" 
+            className="px-3.5 py-1.5 rounded-xl hover:text-[#1E6B38] hover:bg-[#EAF4EB] transition-all whitespace-nowrap"
+            style={{ marginRight: "6px" }}
+          >
+            How It Works
           </Link>
           <button
             type="button"
-            onClick={() => setShowContact(true)}
-            className="hover:text-[#1E6B38] transition-colors cursor-pointer"
+            onClick={() => setShowPricing(true)}
+            className="px-3.5 py-1.5 rounded-xl hover:text-[#1E6B38] hover:bg-[#EAF4EB] transition-all cursor-pointer whitespace-nowrap"
+            style={{ marginRight: "6px" }}
           >
-            Contact Us
+            Pricing
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowResources(true)}
+            className="px-3.5 py-1.5 rounded-xl hover:text-[#1E6B38] hover:bg-[#EAF4EB] transition-all cursor-pointer whitespace-nowrap"
+          >
+            Resources
           </button>
         </nav>
 
@@ -397,12 +413,12 @@ export default function Home() {
 
       </main>
 
-      {/* Interactive Contact Us Modal */}
-      {showContact && (
+      {/* Pricing Modal */}
+      {showPricing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-[#ECE7DD] shadow-2xl space-y-5 relative">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-[#ECE7DD] shadow-2xl space-y-6 relative">
             <button
-              onClick={() => { setShowContact(false); setContactSent(false); }}
+              onClick={() => setShowPricing(false)}
               className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 text-lg w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
             >
               ✕
@@ -410,88 +426,133 @@ export default function Home() {
 
             <div className="space-y-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#1E6B38] bg-[#EAF4EB] px-2.5 py-0.5 rounded-full border border-[#C5E1CB]">
-                Get in Touch
+                Simple &amp; Transparent
               </span>
-              <h3 className="text-xl font-serif font-bold text-[#141A16]">
-                Contact the Skillora Team
+              <h3 className="text-2xl font-serif font-bold text-[#141A16]">
+                Plans &amp; Access
               </h3>
               <p className="text-xs text-[#556056] leading-relaxed">
-                Reach out to the developers regarding our multi-agent architecture, evaluation metrics, or collaboration.
+                Skillora is built as an open-source, verifiable career intelligence platform.
               </p>
             </div>
 
-            {contactSent ? (
-              <div className="p-4 rounded-2xl bg-[#EAF4EB] border border-[#C5E1CB] text-center space-y-1.5">
-                <span className="text-2xl">✉️</span>
-                <p className="text-xs font-bold text-[#1E6B38]">Thank you for reaching out!</p>
-                <p className="text-[11px] text-[#556056]">We have received your message and will get back to you shortly.</p>
-                <button
-                  type="button"
-                  onClick={() => { setShowContact(false); setContactSent(false); }}
-                  className="mt-2 px-4 py-1.5 bg-[#1E6B38] text-white text-xs font-bold rounded-lg"
-                >
-                  Close
-                </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Card 1: Academic / Open Source */}
+              <div className="p-5 rounded-2xl border-2 border-[#1E6B38] bg-[#FAF9F5] space-y-3 relative">
+                <span className="text-[10px] font-bold text-[#1E6B38] bg-[#EAF4EB] border border-[#C5E1CB] px-2 py-0.5 rounded-full uppercase">
+                  Community &amp; Viva
+                </span>
+                <div>
+                  <h4 className="text-base font-bold text-[#141A16]">Student &amp; Academic</h4>
+                  <p className="text-2xl font-serif font-bold text-[#1E6B38] mt-1">₹0 <span className="text-xs font-sans text-slate-500 font-normal">/ forever</span></p>
+                </div>
+                <ul className="text-xs text-[#556056] space-y-2">
+                  <li className="flex items-center gap-1.5">✓ 4-Stage Multi-Agent Pipeline</li>
+                  <li className="flex items-center gap-1.5">✓ Local SQLite Grounding Ledger</li>
+                  <li className="flex items-center gap-1.5">✓ CrewAI Flow &amp; Google ADK</li>
+                  <li className="flex items-center gap-1.5">✓ Verifier Callbacks (Zero Fake Claims)</li>
+                </ul>
               </div>
-            ) : (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!contactName || !contactEmail) return;
-                  setContactSent(true);
-                }}
-                className="space-y-3.5"
+
+              {/* Card 2: Pro */}
+              <div className="p-5 rounded-2xl border border-[#ECE7DD] bg-white space-y-3">
+                <span className="text-[10px] font-bold text-[#78827A] bg-slate-100 px-2 py-0.5 rounded-full uppercase">
+                  Phase 2 Beta
+                </span>
+                <div>
+                  <h4 className="text-base font-bold text-[#141A16]">Pro Career Suite</h4>
+                  <p className="text-2xl font-serif font-bold text-[#141A16] mt-1">Free <span className="text-xs font-sans text-slate-500 font-normal">in Beta</span></p>
+                </div>
+                <ul className="text-xs text-[#556056] space-y-2">
+                  <li className="flex items-center gap-1.5">✓ Deterministic ATS Scoring Engine</li>
+                  <li className="flex items-center gap-1.5">✓ Unlimited Target Job Descriptions</li>
+                  <li className="flex items-center gap-1.5">✓ PDF &amp; Word (.DOCX) Direct Export</li>
+                  <li className="flex items-center gap-1.5">✓ Multi-Profile Custom Weightings</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between gap-3">
+              <span className="text-xs text-[#78827A]">Open source project under MIT License</span>
+              <Link
+                href="/sources"
+                className="px-5 py-2.5 bg-[#121614] hover:bg-black text-white text-xs font-bold rounded-xl shadow-sm transition-all"
               >
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#141A16] mb-1">Your Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={contactName}
-                    onChange={(e) => setContactName(e.target.value)}
-                    placeholder="Prof. Evaluator / Recruiter"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E5E1D5] bg-[#FAF9F6] text-xs text-[#141A16] focus:outline-none focus:border-[#1E6B38] focus:bg-white transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#141A16] mb-1">Your Email</label>
-                  <input
-                    type="email"
-                    required
-                    value={contactEmail}
-                    onChange={(e) => setContactEmail(e.target.value)}
-                    placeholder="evaluator@university.edu"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E5E1D5] bg-[#FAF9F6] text-xs text-[#141A16] focus:outline-none focus:border-[#1E6B38] focus:bg-white transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#141A16] mb-1">Message</label>
-                  <textarea
-                    rows={3}
-                    value={contactMsg}
-                    onChange={(e) => setContactMsg(e.target.value)}
-                    placeholder="Inquiry regarding CrewAI and Google ADK orchestration..."
-                    className="w-full p-3 rounded-xl border border-[#E5E1D5] bg-[#FAF9F6] text-xs text-[#141A16] focus:outline-none focus:border-[#1E6B38] focus:bg-white transition-all resize-none leading-relaxed"
-                  />
-                </div>
+                Launch Workspace →
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
-                <div className="pt-2 flex items-center justify-between gap-3">
-                  <div className="text-[11px] text-[#78827A]">
-                    Email: <a href="mailto:palak@skillora.ai" className="text-[#1E6B38] hover:underline font-mono">palak@skillora.ai</a>
+      {/* Resources Modal */}
+      {showResources && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-[#ECE7DD] shadow-2xl space-y-5 relative">
+            <button
+              onClick={() => setShowResources(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 text-lg w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              ✕
+            </button>
+
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#1E6B38] bg-[#EAF4EB] px-2.5 py-0.5 rounded-full border border-[#C5E1CB]">
+                Technical Specs &amp; Links
+              </span>
+              <h3 className="text-2xl font-serif font-bold text-[#141A16]">
+                Developer Resources
+              </h3>
+              <p className="text-xs text-[#556056] leading-relaxed">
+                Documentation, architecture charts, evaluation scripts, and source code.
+              </p>
+            </div>
+
+            <div className="space-y-2.5">
+              <Link
+                href="/how-it-works"
+                className="p-3.5 rounded-xl border border-[#ECE7DD] bg-[#FAF9F5] hover:bg-[#EAF4EB] hover:border-[#C5E1CB] flex items-center justify-between transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">📐</span>
+                  <div>
+                    <h5 className="text-xs font-bold text-[#141A16] group-hover:text-[#1E6B38]">Multi-Agent Architecture Guide</h5>
+                    <p className="text-[11px] text-[#78827A]">Detailed breakdown of CrewAI flows &amp; Google ADK agent roles</p>
                   </div>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 bg-[#121614] hover:bg-black text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer"
-                  >
-                    Send Message →
-                  </button>
                 </div>
-              </form>
-            )}
+                <span className="text-xs text-[#1E6B38] font-bold">Read →</span>
+              </Link>
 
-            <div className="pt-3 border-t border-[#ECE7DD] text-[10px] text-[#78827A] flex items-center justify-between">
-              <span>Team: Palak · Manya · Vanshik · Harman</span>
-              <span className="font-mono">github.com/palakbhatt1/SkillOra</span>
+              <a
+                href="https://github.com/palakbhatt1/SkillOra"
+                target="_blank"
+                rel="noreferrer"
+                className="p-3.5 rounded-xl border border-[#ECE7DD] bg-[#FAF9F5] hover:bg-[#EAF4EB] hover:border-[#C5E1CB] flex items-center justify-between transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">🐙</span>
+                  <div>
+                    <h5 className="text-xs font-bold text-[#141A16] group-hover:text-[#1E6B38]">GitHub Repository</h5>
+                    <p className="text-[11px] text-[#78827A]">Source code, backend FastAPI services, and Docker configs</p>
+                  </div>
+                </div>
+                <span className="text-xs text-[#1E6B38] font-bold">GitHub ↗</span>
+              </a>
+
+              <div className="p-3.5 rounded-xl border border-[#ECE7DD] bg-[#FAF9F5] space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">🧪</span>
+                  <h5 className="text-xs font-bold text-[#141A16]">Evaluation Benchmarks</h5>
+                </div>
+                <p className="text-[11px] text-[#556056] leading-relaxed">
+                  100% Fact Recall · 100% Citation Validity · 97% Fabrication Catch Rate on CSE3101 test sets.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-[#ECE7DD] text-[10px] text-[#78827A] flex items-center justify-between">
+              <span>SkillOra v1.0 · CSE3101 Project</span>
+              <span>Palak · Manya · Vanshik · Harman</span>
             </div>
           </div>
         </div>
