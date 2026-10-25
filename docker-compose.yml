@@ -1,0 +1,23 @@
+# SkillOra database. Run:  docker compose up -d db
+# Data lives in the named volume "skillora_pgdata" and survives restarts.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: skillora-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: skillora
+      POSTGRES_USER: skillora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-skillora_dev_pw}
+    ports:
+      - "5433:5432"
+    volumes:
+      - skillora_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skillora -d skillora"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  skillora_pgdata:

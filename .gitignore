@@ -30,3 +30,8 @@ out/
 Thumbs.db
 .vscode/
 .idea/
+
+# Local backups & archives
+*.zip
+src_original_backup/
+app_original_backup/

@@ -1,62 +1,77 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional
 from sqlalchemy.orm import Session
 
-from app.db.database import get_db
-from app.db.models import Fact
+from app import service
+from app.api.deps import current_user, get_user_fact
+from app.db import Fact, User, get_db, next_seq
 
-router = APIRouter()
+router = APIRouter(prefix="/api/facts", tags=["facts"])
 
-class FactUpdate(BaseModel):
-    status: Optional[str] = None # 'verified', 'pending', 'rejected', 'stale'
-    claim: Optional[str] = None
-    source_span: Optional[str] = None
-    fact_type: Optional[str] = None
 
-class FactResponse(BaseModel):
-    id: int
-    project_id: int
-    fact_type: str
-    claim: str
-    source_span: str
-    source_file: str
-    status: str
+class FactPatch(BaseModel):
+    status: str | None = None
+    text: str | None = None
 
-    class Config:
-        from_attributes = True
 
-@router.get("/{fact_id}", response_model=FactResponse)
-def get_fact(fact_id: int, db: Session = Depends(get_db)):
-    fact = db.query(Fact).filter(Fact.id == fact_id).first()
-    if not fact:
-        raise HTTPException(status_code=404, detail="Fact not found")
-    return fact
+class BulkIn(BaseModel):
+    project: str | None = None
+    status: str = "verified"
+    scope: str = "pending"
 
-@router.patch("/{fact_id}", response_model=FactResponse)
-def update_fact(fact_id: int, update: FactUpdate, db: Session = Depends(get_db)):
-    fact = db.query(Fact).filter(Fact.id == fact_id).first()
-    if not fact:
-        raise HTTPException(status_code=404, detail="Fact not found")
 
-    if update.status is not None:
-        fact.status = update.status
-    if update.claim is not None:
-        fact.claim = update.claim
-    if update.source_span is not None:
-        fact.source_span = update.source_span
-    if update.fact_type is not None:
-        fact.fact_type = update.fact_type
+class DeclareIn(BaseModel):
+    skill: str
 
+
+@router.get("")
+def list_facts(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    return [service.fact_api(f) for f in service.all_facts(db, user.id, include_rejected=True)]
+
+
+@router.patch("/{fid}")
+def patch_fact(fid: str, b: FactPatch, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    f = get_user_fact(db, fid, user)
+    f.auto = 0
+    if b.status:
+        if b.status not in {"pending", "verified", "rejected", "stale"}:
+            raise HTTPException(422, "bad status")
+        f.status = b.status
+    if b.text is not None:
+        f.text = b.text.strip()
+        f.status = "verified"
     db.commit()
-    db.refresh(fact)
-    return fact
+    return service.fact_api(f)
 
-@router.delete("/{fact_id}")
-def delete_fact(fact_id: int, db: Session = Depends(get_db)):
-    fact = db.query(Fact).filter(Fact.id == fact_id).first()
-    if not fact:
-        raise HTTPException(status_code=404, detail="Fact not found")
-    db.delete(fact)
+
+@router.post("/bulk")
+def bulk(b: BulkIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Confirm every PENDING fact in one group - one click instead of 40."""
+    if b.status not in {"verified", "rejected"}:
+        raise HTTPException(422, "bad status")
+    q = db.query(Fact).filter(Fact.user_id == user.id)
+    q = q.filter(Fact.status == "pending") if b.scope == "pending" else q.filter(Fact.status.in_(["pending", "verified", "stale"]), Fact.declared == 0)
+    if b.project:
+        q = q.filter(Fact.project == b.project)
+    n = q.update({Fact.status: b.status, Fact.auto: 0}, synchronize_session=False)
     db.commit()
-    return {"status": "deleted", "id": fact_id}
+    return {"updated": n}
+
+
+@router.post("/declare")
+def declare(b: DeclareIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Self-declared skill: counts in the score at lower weight, never used to write a project bullet."""
+    f = Fact(
+        user_id=user.id,
+        seq=next_seq(db, user.id),
+        source_id=None,
+        text=b.skill.strip(),
+        span="",
+        project="Skills",
+        category="skill",
+        status="verified",
+        declared=1,
+    )
+    db.add(f)
+    db.commit()
+    return service.fact_api(f)
