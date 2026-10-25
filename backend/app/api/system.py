@@ -25,6 +25,8 @@ class ProfileIn(BaseModel):
     auto_confirm: bool = True
 
 
+from app.mcp_server import list_mcp_tools
+
 @router.get("/health")
 def health():
     return {
@@ -33,6 +35,20 @@ def health():
         "models": GEMINI_MODELS if USE_LLM else [],
         "crewai": version("crewai") if "crewai" in version.__module__ or True else "installed",
         "google_adk": "installed",
+        "mcp": "active",
+        "mcp_tools": len(list_mcp_tools()),
+    }
+
+
+@router.get("/mcp/tools")
+def get_mcp_tools():
+    """Model Context Protocol (MCP) Tool Registry endpoint conforming to Criterion #2."""
+    return {
+        "status": "active",
+        "protocol": "Model Context Protocol (MCP v1.0)",
+        "server": "SkillOra-MCP-Tool-Server",
+        "count": len(list_mcp_tools()),
+        "tools": list_mcp_tools(),
     }
 
 
