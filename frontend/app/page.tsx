@@ -1,9 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
 export default function Home() {
+  const [showContact, setShowContact] = useState(false);
+  const [contactSent, setContactSent] = useState(false);
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactMsg, setContactMsg] = useState("");
   return (
     <div className="h-screen w-screen max-h-screen overflow-hidden bg-[#FAF9F5] text-[#141A16] relative flex flex-col justify-between selection:bg-[#DCFCE7] selection:text-[#166534]">
       
@@ -31,22 +37,20 @@ export default function Home() {
         </Link>
 
         {/* Center Nav Links */}
-        <nav className="hidden md:flex items-center gap-7 text-xs font-medium text-[#465048]">
-          <Link href="/sources" className="hover:text-[#141A16] transition-colors flex items-center gap-1">
-            <span>Sources</span>
+        <nav className="hidden md:flex items-center gap-8 text-xs font-semibold text-[#465048]">
+          <Link href="/" className="hover:text-[#1E6B38] transition-colors">
+            Home
           </Link>
-          <Link href="/verify" className="hover:text-[#141A16] transition-colors">
-            Fact Ledger
+          <Link href="/how-it-works" className="hover:text-[#1E6B38] transition-colors">
+            About
           </Link>
-          <Link href="/job" className="hover:text-[#141A16] transition-colors">
-            Job Match
-          </Link>
-          <Link href="/tailor" className="hover:text-[#141A16] transition-colors">
-            Tailor & Chat
-          </Link>
-          <Link href="/how-it-works" className="hover:text-[#141A16] transition-colors">
-            How It Works
-          </Link>
+          <button
+            type="button"
+            onClick={() => setShowContact(true)}
+            className="hover:text-[#1E6B38] transition-colors cursor-pointer"
+          >
+            Contact Us
+          </button>
         </nav>
 
         {/* Right CTA */}
@@ -392,6 +396,106 @@ export default function Home() {
         </div>
 
       </main>
+
+      {/* Interactive Contact Us Modal */}
+      {showContact && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-[#ECE7DD] shadow-2xl space-y-5 relative">
+            <button
+              onClick={() => { setShowContact(false); setContactSent(false); }}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 text-lg w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              ✕
+            </button>
+
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#1E6B38] bg-[#EAF4EB] px-2.5 py-0.5 rounded-full border border-[#C5E1CB]">
+                Get in Touch
+              </span>
+              <h3 className="text-xl font-serif font-bold text-[#141A16]">
+                Contact the Skillora Team
+              </h3>
+              <p className="text-xs text-[#556056] leading-relaxed">
+                Reach out to the developers regarding our multi-agent architecture, evaluation metrics, or collaboration.
+              </p>
+            </div>
+
+            {contactSent ? (
+              <div className="p-4 rounded-2xl bg-[#EAF4EB] border border-[#C5E1CB] text-center space-y-1.5">
+                <span className="text-2xl">✉️</span>
+                <p className="text-xs font-bold text-[#1E6B38]">Thank you for reaching out!</p>
+                <p className="text-[11px] text-[#556056]">We have received your message and will get back to you shortly.</p>
+                <button
+                  type="button"
+                  onClick={() => { setShowContact(false); setContactSent(false); }}
+                  className="mt-2 px-4 py-1.5 bg-[#1E6B38] text-white text-xs font-bold rounded-lg"
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!contactName || !contactEmail) return;
+                  setContactSent(true);
+                }}
+                className="space-y-3.5"
+              >
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#141A16] mb-1">Your Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={contactName}
+                    onChange={(e) => setContactName(e.target.value)}
+                    placeholder="Prof. Evaluator / Recruiter"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E5E1D5] bg-[#FAF9F6] text-xs text-[#141A16] focus:outline-none focus:border-[#1E6B38] focus:bg-white transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#141A16] mb-1">Your Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder="evaluator@university.edu"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E5E1D5] bg-[#FAF9F6] text-xs text-[#141A16] focus:outline-none focus:border-[#1E6B38] focus:bg-white transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#141A16] mb-1">Message</label>
+                  <textarea
+                    rows={3}
+                    value={contactMsg}
+                    onChange={(e) => setContactMsg(e.target.value)}
+                    placeholder="Inquiry regarding CrewAI and Google ADK orchestration..."
+                    className="w-full p-3 rounded-xl border border-[#E5E1D5] bg-[#FAF9F6] text-xs text-[#141A16] focus:outline-none focus:border-[#1E6B38] focus:bg-white transition-all resize-none leading-relaxed"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-between gap-3">
+                  <div className="text-[11px] text-[#78827A]">
+                    Email: <a href="mailto:palak@skillora.ai" className="text-[#1E6B38] hover:underline font-mono">palak@skillora.ai</a>
+                  </div>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 bg-[#121614] hover:bg-black text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer"
+                  >
+                    Send Message →
+                  </button>
+                </div>
+              </form>
+            )}
+
+            <div className="pt-3 border-t border-[#ECE7DD] text-[10px] text-[#78827A] flex items-center justify-between">
+              <span>Team: Palak · Manya · Vanshik · Harman</span>
+              <span className="font-mono">github.com/palakbhatt1/SkillOra</span>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
