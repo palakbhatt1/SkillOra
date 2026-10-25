@@ -13,8 +13,9 @@ export const screens = [
   { href: "/verify", step: "2", label: "Fact Ledger", icon: "⚖️" },
   { href: "/job", step: "3", label: "Job Match", icon: "🎯" },
   { href: "/tailor", step: "4", label: "Tailor & Chat", icon: "✨" },
-  { href: "/score", step: "5", label: "Score & ATS", icon: "📊" },
-  { href: "/export", step: "6", label: "Export", icon: "⤓" },
+  // Phase 2 Roadmap (Commented out for 60% Mid-Term Milestone):
+  // { href: "/score", step: "5", label: "Score & ATS", icon: "📊" },
+  // { href: "/export", step: "6", label: "Export", icon: "⤓" },
 ];
 
 export default function AppShell({ children }: { children: ReactNode }) {
@@ -94,7 +95,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
           {/* Right Header Badges & Actions */}
           <div className="flex items-center gap-3">
-            {/* Live ATS Score Pill */}
+            {/* Live ATS Score Pill (Phase 2 - commented out for Mid-Term) */}
+            {/*
             <Link
               href="/score"
               className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#E5E1D5] hover:border-[#1E6B38] shadow-sm transition-all"
@@ -104,6 +106,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 {live && !analyzed ? "—" : `${score}/100`}
               </span>
             </Link>
+            */}
 
             {/* Agent Telemetry Toggle */}
             <button

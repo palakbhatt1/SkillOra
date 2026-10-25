@@ -311,8 +311,9 @@ export default function Home() {
                             className="px-3 py-1 rounded-full bg-[#F3F2EC] hover:bg-[#EBE9E0] text-xs font-medium text-slate-800 border border-[#DCD9CE] flex items-center gap-1 transition-all shadow-sm"
                           >
                             <span>✎</span>
-                            <span>Edit</span>
+                            <span>Tailor & Ground</span>
                           </Link>
+                          {/* Phase 2 Export - Commented out for Mid-Term
                           <Link
                             href="/export"
                             className="px-3.5 py-1 bg-[#141A16] hover:bg-black text-white text-xs font-medium rounded-full flex items-center gap-1.5 shadow-sm transition-all"
@@ -320,6 +321,7 @@ export default function Home() {
                             <span>⤓</span>
                             <span>Export</span>
                           </Link>
+                          */}
                         </div>
                       </div>
 

@@ -173,6 +173,8 @@ export default function TailorPage() {
             <span>{isVerifying ? "Verifying..." : "✓ Run Verifier"}</span>
           </button>
 
+          {/* Phase 2 Link (Stage 5) - Commented out for Mid-Term */}
+          {/*
           <Link
             href="/score"
             className="px-6 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-1.5"
@@ -180,6 +182,10 @@ export default function TailorPage() {
             <span>Check ATS Score</span>
             <span>→</span>
           </Link>
+          */}
+          <span className="px-4 py-2 bg-[#EAF4EB] text-[#1E6B38] border border-[#C5E1CB] rounded-full font-bold text-xs flex items-center gap-1.5 shadow-sm">
+            <span>✓ 60% Milestone Reached</span>
+          </span>
         </div>
       </div>
 
@@ -397,6 +403,8 @@ export default function TailorPage() {
           <span>← Back to Job Match</span>
         </Link>
 
+        {/* Phase 2 Link (Stage 5) - Commented out for Mid-Term */}
+        {/*
         <Link
           href="/score"
           className="px-6 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-1.5"
@@ -404,6 +412,10 @@ export default function TailorPage() {
           <span>Check ATS Fit Score</span>
           <span>→</span>
         </Link>
+        */}
+        <div className="flex items-center gap-2 text-xs font-bold text-[#1E6B38] bg-[#EAF4EB] border border-[#C5E1CB] px-4 py-2 rounded-full shadow-sm">
+          <span>✓ Core Agentic Pipeline Validated</span>
+        </div>
       </div>
 
     </div>
