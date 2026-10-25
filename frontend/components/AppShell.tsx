@@ -7,6 +7,7 @@ import { useState, type ReactNode } from "react";
 import { useStore } from "@/lib/store";
 import AgentPanel from "./AgentPanel";
 import Ambient from "./Ambient";
+import RequirementsModal from "./RequirementsModal";
 
 export const screens = [
   { href: "/sources", step: "1", label: "Sources", icon: "📥" },
@@ -22,6 +23,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const path = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAgentTelemetry, setShowAgentTelemetry] = useState(false);
+  const [showRequirements, setShowRequirements] = useState(false);
   const { score, live, ready, llm, busy, error, notice, mode, profile, logout, analyzed } = useStore();
 
   const currentScreenIndex = screens.findIndex(s => s.href === path);
@@ -107,6 +109,17 @@ export default function AppShell({ children }: { children: ReactNode }) {
               </span>
             </Link>
             */}
+
+            {/* 11 Requirements Matrix for Faculty & Evaluators */}
+            <button
+              type="button"
+              onClick={() => setShowRequirements(true)}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 bg-[#EAF4EB] text-[#1E6B38] border border-[#BDE0C3] hover:bg-[#D5EBD7] transition-all cursor-pointer shadow-xs"
+              title="View 11 Course Requirements Compliance Matrix"
+            >
+              <span>📋</span>
+              <span className="hidden sm:inline">11 Requirements</span>
+            </button>
 
             {/* Agent Telemetry Toggle */}
             <button
@@ -248,7 +261,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </footer>
-
+      <RequirementsModal isOpen={showRequirements} onClose={() => setShowRequirements(false)} />
     </div>
   );
 }

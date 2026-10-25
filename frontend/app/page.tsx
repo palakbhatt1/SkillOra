@@ -3,10 +3,12 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import RequirementsModal from "@/components/RequirementsModal";
 
 export default function Home() {
   const [showPricing, setShowPricing] = useState(false);
   const [showResources, setShowResources] = useState(false);
+  const [showRequirements, setShowRequirements] = useState(false);
   return (
     <div className="h-screen w-screen max-h-screen overflow-hidden bg-[#FAF9F5] text-[#141A16] relative flex flex-col justify-between selection:bg-[#DCFCE7] selection:text-[#166534]">
       
@@ -70,7 +72,18 @@ export default function Home() {
         </nav>
 
         {/* Right CTA */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* 11 Requirements Matrix for Evaluators */}
+          <button
+            type="button"
+            onClick={() => setShowRequirements(true)}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#EAF4EB] text-[#1E6B38] border border-[#BDE0C3] hover:bg-[#D5EBD7] transition-all cursor-pointer shadow-xs"
+            title="View 11 Course Requirements Compliance Matrix"
+          >
+            <span>📋</span>
+            <span>11 Requirements</span>
+          </button>
+
           <Link 
             href="/login" 
             className="hidden sm:inline-block text-xs font-medium text-[#465048] hover:text-[#141A16] transition-colors"
@@ -509,6 +522,24 @@ export default function Home() {
             </div>
 
             <div className="space-y-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowResources(false);
+                  setShowRequirements(true);
+                }}
+                className="w-full text-left p-3.5 rounded-xl border border-[#C5E1CB] bg-[#EAF4EB] hover:bg-[#D5EBD7] flex items-center justify-between transition-all group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">📋</span>
+                  <div>
+                    <h5 className="text-xs font-bold text-[#1E6B38]">11 Requirements Compliance Matrix</h5>
+                    <p className="text-[11px] text-[#2C6B38]">Verified rubric checklist with live MCP &amp; Eval test proofs</p>
+                  </div>
+                </div>
+                <span className="text-xs text-[#1E6B38] font-bold">Open Matrix →</span>
+              </button>
+
               <Link
                 href="/how-it-works"
                 className="p-3.5 rounded-xl border border-[#ECE7DD] bg-[#FAF9F5] hover:bg-[#EAF4EB] hover:border-[#C5E1CB] flex items-center justify-between transition-all group"
@@ -557,6 +588,9 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* 11 Requirements Matrix Modal */}
+      <RequirementsModal isOpen={showRequirements} onClose={() => setShowRequirements(false)} />
 
     </div>
   );
