@@ -24,6 +24,7 @@ backend/data/*.db
 node_modules/
 .next/
 out/
+*.tsbuildinfo
 
 # OS / Editor
 .DS_Store

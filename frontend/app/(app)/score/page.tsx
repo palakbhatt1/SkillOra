@@ -12,31 +12,68 @@ export default function ScorePage() {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
+      {/* Active Agent Banner: Deterministic Scoring Engine */}
+      <div className="p-3.5 rounded-2xl bg-[#FAF9F5] border border-[#DDD7CA] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5">
+          <span className="p-1.5 rounded-xl bg-blue-50 text-blue-800 border border-blue-200">
+            <svg className="w-4 h-4 text-blue-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[#141A16]">Active Engine on This Stage: Deterministic ATS Scoring Algorithm</span>
+              <span className="text-[10px] font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                Python · Zero LLM Drift
+              </span>
+            </div>
+            <p className="text-[#556056] text-[11px] mt-0.5">
+              Code, not an LLM. Computes 5 weighted ATS dimensions with RapidFuzz evidence weighting and separate eligibility gating.
+            </p>
+          </div>
+        </div>
+
+        <Link
+          href="/faculty"
+          className="px-3.5 py-1.5 bg-white hover:bg-[#FAF9F5] text-[#1E6B38] border border-[#C5E1CB] font-bold text-xs rounded-full shadow-2xs transition-all shrink-0 self-start sm:self-auto flex items-center gap-1 cursor-pointer"
+        >
+          <span>System Architecture</span>
+          <span>→</span>
+        </Link>
+      </div>
       
       {/* Header section */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-[#1E6B38] bg-[#EAF4EB] px-2.5 py-0.5 rounded-full border border-[#C5E1CB]">
-              Stage 5 · Explainable Scoring
+              Explainable Match Scoring
             </span>
             <span className="text-xs text-[#78827A]">Deterministic 5-Component ATS Engine</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-serif font-normal text-[#141A16] tracking-tight">
-            Job-Fit Score & Analysis
+            Job Match Score &amp; Analysis
           </h1>
           <p className="text-sm text-[#556056] max-w-2xl leading-relaxed">
             No black-box guesses. Skillora computes a transparent 0-100 score based on verified evidence, skill overlap, and role requirements.
           </p>
         </div>
 
-        <Link
-          href="/export"
-          className="px-6 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs sm:text-sm shadow-md transition-all shrink-0 flex items-center gap-1.5 self-start sm:self-auto"
-        >
-          <span>Proceed to Export</span>
-          <span>→</span>
-        </Link>
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <Link
+            href="/tailor"
+            className="px-6 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs sm:text-sm shadow-md transition-all shrink-0 flex items-center gap-1.5"
+          >
+            <span>Improve Resume</span>
+            <span>→</span>
+          </Link>
+          <Link
+            href="/export"
+            className="px-4 py-2.5 bg-white hover:bg-[#FAF9F5] text-[#141A16] border border-[#DDD7CA] rounded-full font-semibold text-xs sm:text-sm shadow-xs transition-all shrink-0 flex items-center gap-1"
+          >
+            <span>Export Directly</span>
+          </Link>
+        </div>
       </div>
 
       {/* Role Profile Switcher */}
@@ -90,16 +127,16 @@ export default function ScorePage() {
 
           <div className="flex flex-wrap gap-2 justify-center text-xs">
             <span className="px-3 py-1 rounded-full bg-[#EAF4EB] text-[#1E6B38] font-semibold border border-[#C5E1CB]">
-              ✓ Deterministic Formula
+              Deterministic Formula
             </span>
             {pendingCount > 0 && (
               <span className="px-3 py-1 rounded-full bg-[#FEF3C7] text-[#92400E] font-semibold border border-[#FDE68A]">
-                ⚠️ {pendingCount} facts pending
+                {pendingCount} facts pending verification
               </span>
             )}
             {openKeywords > 0 && (
               <span className="px-3 py-1 rounded-full bg-[#EFF6FF] text-[#1D4ED8] font-semibold border border-[#DBEAFE]">
-                💡 {openKeywords} keyword suggestions
+                {openKeywords} keyword suggestions
               </span>
             )}
           </div>
@@ -170,20 +207,37 @@ export default function ScorePage() {
 
       {/* Bottom Navigation */}
       <div className="pt-4 flex items-center justify-between border-t border-[#ECE7DD]">
-        <Link
-          href="/tailor"
-          className="text-xs font-semibold text-[#556056] hover:text-[#141A16] flex items-center gap-1"
-        >
-          <span>← Back to Resume Editor</span>
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/job"
+            className="text-xs font-semibold text-[#556056] hover:text-[#141A16] flex items-center gap-1"
+          >
+            <span>← Back to Job Match</span>
+          </Link>
+          <span className="text-slate-300">•</span>
+          <Link
+            href="/verify"
+            className="text-xs font-semibold text-[#556056] hover:text-[#141A16] flex items-center gap-1"
+          >
+            <span>Inspect Fact Ledger</span>
+          </Link>
+        </div>
 
-        <Link
-          href="/export"
-          className="px-6 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-1.5"
-        >
-          <span>Continue to Export</span>
-          <span>→</span>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/export"
+            className="text-xs font-semibold text-[#556056] hover:text-[#141A16] hidden sm:inline"
+          >
+            Skip to Export
+          </Link>
+          <Link
+            href="/tailor"
+            className="px-6 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-1.5"
+          >
+            <span>Proceed to Tailor Resume</span>
+            <span>→</span>
+          </Link>
+        </div>
       </div>
 
     </div>

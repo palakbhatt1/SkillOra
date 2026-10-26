@@ -76,6 +76,37 @@ def regenerate(job_id: int, db: Session = Depends(get_db), user: User = Depends(
     return service.job_view(db, job)
 
 
+class AddBulletIn(BaseModel):
+    project: str = "SkillOra"
+    text: str
+    facts: list[str] = []
+    verified: bool = True
+
+
+@router.post("/{job_id}/bullets")
+def add_bullet(job_id: int, b: AddBulletIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    job = get_user_job(db, job_id, user)
+    d = dict(job.data)
+    d["history"] = (list(d.get("history", [])) + [json.loads(json.dumps(d["resume"]))])[-10:]
+    r = dict(d["resume"])
+    bullets = list(r.get("bullets", []))
+    new_id = f"U{len(bullets) + 1}"
+    bullets.append({
+        "id": new_id,
+        "project": b.project,
+        "kind": "project",
+        "text": b.text.strip(),
+        "facts": b.facts,
+        "verified": b.verified,
+        "user": True
+    })
+    r["bullets"] = bullets
+    d["resume"] = r
+    job.data = d
+    db.commit()
+    return service.job_view(db, job)
+
+
 @router.patch("/{job_id}/bullets/{bid}")
 def edit_bullet(job_id: int, bid: str, b: BulletIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
     job = get_user_job(db, job_id, user)

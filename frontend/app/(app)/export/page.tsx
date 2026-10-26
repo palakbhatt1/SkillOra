@@ -64,7 +64,7 @@ export default function ExportPage() {
 
   const handleDownload = (fmt: "pdf" | "docx") => {
     if (bullets.length === 0) {
-      return showToast("No resume bullets generated yet. Please complete Stage 3 & 4 first.");
+      return showToast("No resume bullets generated yet. Please complete Job Match & Tailoring first.");
     }
     if (live && jobId) {
       window.location.href = api.exportUrl(jobId, fmt);
@@ -97,13 +97,42 @@ export default function ExportPage() {
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
+      {/* Active Agent Banner: Preflight Verifier & Export Engine */}
+      <div className="p-3.5 rounded-2xl bg-[#FAF9F5] border border-[#DDD7CA] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5">
+          <span className="p-1.5 rounded-xl bg-[#EAF4EB] text-[#1E6B38] border border-[#C5E1CB]">
+            <svg className="w-4 h-4 text-[#1E6B38]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[#141A16]">Active Engine on This Stage: Preflight Verifier &amp; Export Formatter</span>
+              <span className="text-[10px] font-bold text-[#1E6B38] bg-[#EAF4EB] px-2 py-0.5 rounded-full border border-[#C5E1CB]">
+                ReportLab &amp; python-docx
+              </span>
+            </div>
+            <p className="text-[#556056] text-[11px] mt-0.5">
+              Deterministic preflight integrity audit ensuring 100% citation grounding, zero unverified claims, and ATS vector styling.
+            </p>
+          </div>
+        </div>
+
+        <Link
+          href="/faculty"
+          className="px-3.5 py-1.5 bg-white hover:bg-[#FAF9F5] text-[#1E6B38] border border-[#C5E1CB] font-bold text-xs rounded-full shadow-2xs transition-all shrink-0 self-start sm:self-auto flex items-center gap-1 cursor-pointer"
+        >
+          <span>System Architecture</span>
+          <span>→</span>
+        </Link>
+      </div>
       
       {/* Header section */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-[#1E6B38] bg-[#EAF4EB] px-2.5 py-0.5 rounded-full border border-[#C5E1CB]">
-              Stage 6 · Final Export
+              Verified ATS Export
             </span>
             <span className="text-xs text-[#78827A]">Production-Ready Resume</span>
           </div>
@@ -189,7 +218,11 @@ export default function ExportPage() {
             className="w-full p-4 rounded-xl border border-[#ECE7DD] bg-[#FAF9F5] hover:bg-[#EAF4EB] hover:border-[#C5E1CB] transition-all flex items-center justify-between text-left group cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <span className="text-2xl">📄</span>
+              <span className="p-2.5 rounded-xl bg-white border border-[#ECE7DD] text-[#1E6B38] group-hover:border-[#C5E1CB]">
+                <svg className="w-5 h-5 text-[#1E6B38]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </span>
               <div>
                 <p className="text-sm font-bold text-[#141A16] group-hover:text-[#1E6B38]">
                   Download PDF Resume
@@ -208,7 +241,11 @@ export default function ExportPage() {
             className="w-full p-4 rounded-xl border border-[#ECE7DD] bg-[#FAF9F5] hover:bg-[#EAF4EB] hover:border-[#C5E1CB] transition-all flex items-center justify-between text-left group cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <span className="text-2xl">📝</span>
+              <span className="p-2.5 rounded-xl bg-white border border-[#ECE7DD] text-[#1E6B38] group-hover:border-[#C5E1CB]">
+                <svg className="w-5 h-5 text-[#1E6B38]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </span>
               <div>
                 <p className="text-sm font-bold text-[#141A16] group-hover:text-[#1E6B38]">
                   Download Word (.DOCX)
@@ -231,12 +268,21 @@ export default function ExportPage() {
 
       {/* Bottom Navigation */}
       <div className="pt-4 flex items-center justify-between border-t border-[#ECE7DD]">
-        <Link
-          href="/score"
-          className="text-xs font-semibold text-[#556056] hover:text-[#141A16] flex items-center gap-1"
-        >
-          <span>← Back to Score Report</span>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/tailor"
+            className="text-xs font-semibold text-[#556056] hover:text-[#141A16] flex items-center gap-1"
+          >
+            <span>← Back to Resume Canvas</span>
+          </Link>
+          <span className="text-slate-300">•</span>
+          <Link
+            href="/score"
+            className="text-xs font-semibold text-[#556056] hover:text-[#141A16] flex items-center gap-1"
+          >
+            <span>Job-Fit Score</span>
+          </Link>
+        </div>
 
         <Link
           href="/sources"

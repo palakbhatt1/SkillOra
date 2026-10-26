@@ -1,0 +1,32 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 1496 >>
+stream
+BT /F1 10 Tf 40 760 Td 13 TL (PRIYA SHARMA) ' (AI/ML Engineer & Systems Researcher) ' (Email: priya.sharma@example.com | Phone: +1 \(555\) 234-5678 | GitHub: github.com/priyasharma-ai) ' () ' (PROFESSIONAL SUMMARY) ' (Machine Learning Engineer with 3+ years experience building production LLM pipelines, RAG systems, and deep learning architectures.) ' () ' (TECHNICAL SKILLS) ' (Languages: Python, C++, SQL, TypeScript) ' (AI/ML Frameworks: PyTorch, Hugging Face, LangChain, CrewAI, Google ADK, FAISS, Pinecone) ' (Backend & DevOps: FastAPI, Docker, PostgreSQL, Redis, Kubernetes, Git) ' () ' (PROFESSIONAL EXPERIENCE) ' (AI Research Engineer - NeuroSynthetics \(2022 - Present\)) ' (- Architected multi-agent conversational RAG platform serving 150K active queries monthly.) ' (- Reduced vector retrieval and embedding latency by 45% using FAISS clustering and semantic caching.) ' (- Evaluated and fine-tuned open-source LLMs \(Llama 3, Mistral\) achieving 92.4% benchmark accuracy.) ' (- Engineered automated factual verification guardrails catching 99.1% of hallucinated outputs.) ' () ' (Machine Learning Developer - DeepMetric Labs \(2020 - 2022\)) ' (- Built automated document parser pipeline extracting tabular financial entities with 96% precision.) ' (- Deployed real-time inference microservices using FastAPI and Docker on AWS ECS.) ' () ' (EDUCATION & DEGREES) ' (Bachelor of Technology in Computer Science & Engineering - Tech University \(2016 - 2020\)) ' (CGPA: 8.9 / 10.0) ' ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001789 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1859
+%%EOF

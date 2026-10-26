@@ -6,11 +6,14 @@ from app import activity, service
 from app.api.deps import current_user
 from app.db import Source, User, get_db
 from app.parsers import (
+    check_input,
     extract_github_links,
+    extract_resume_entities,
     fetch_github,
     list_user_repos,
     parse_bytes,
     parse_code_folder,
+    validate_resume_document,
 )
 
 router = APIRouter(prefix="/api", tags=["sources"])
@@ -58,6 +61,10 @@ async def upload(
     with activity.step(user.id, "Document parser", "pdfplumber · python-docx · python-pptx · zip") as s:
         stype, text, urls = parse_bytes(file.filename or "upload.txt", data)
         s["note"] = f"{file.filename} · {len(text):,} characters"
+
+    # SkillOra Safety & Relevance Guardrails
+    check_input(text, kind="source")
+    validate_resume_document(text, file.filename or "upload.txt")
     detail = f"{stype.upper()} · {len(data) // 1024} KB"
     name = file.filename or "upload"
     if source_id:
@@ -66,11 +73,29 @@ async def upload(
             name, stype = old.name, old.type
     src, info = service.ingest_text(db, user.id, name=name, stype=stype, text=text, detail=detail)
     info["github"] = extract_github_links(text, urls)
-    if not user.links and info["github"]["profiles"]:
+    extracted = {}
+    if stype in ("pdf", "docx", "pptx", "note"):
+        extracted = extract_resume_entities(text, urls)
+        if extracted.get("name"):
+            user.name = extracted["name"]
+        if extracted.get("phone") and hasattr(user, "phone"):
+            user.phone = extracted["phone"]
+        if extracted.get("location"):
+            user.location = extracted["location"]
+        if extracted.get("education_summary"):
+            user.education = extracted["education_summary"]
+        if extracted.get("github_user"):
+            user.links = f"github.com/{extracted['github_user']}"
+        db.add(user)
+        db.commit()
+    elif not user.links and info["github"]["profiles"]:
         user.links = "github.com/" + info["github"]["profiles"][0]
         db.add(user)
         db.commit()
-    return _ingested(db, src, info)
+
+    res = _ingested(db, src, info)
+    res["extracted"] = extracted
+    return res
 
 
 @router.post("/sources/folder")
@@ -83,9 +108,9 @@ def add_code_folder(b: FolderIn, db: Session = Depends(get_db), user: User = Dep
 
 
 @router.get("/github/repos")
-def github_repos(user_name: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def github_repos(user_name: str, limit: int = 100, db: Session = Depends(get_db), user: User = Depends(current_user)):
     have = {s.name.lower() for s in db.query(Source).filter(Source.user_id == user.id, Source.type == "github").all()}
-    return [{**r, "added": r["repo"].lower() in have} for r in list_user_repos(user_name.strip())]
+    return [{**r, "added": r["repo"].lower() in have} for r in list_user_repos(user_name.strip(), limit=limit)]
 
 
 @router.post("/sources/note")

@@ -18,9 +18,13 @@ DEGREE_LINE_RE = re.compile(r"\b(b\.?\s?tech|bachelor|m\.?\s?tech|master|b\.?e\b
 class ProfileIn(BaseModel):
     name: str = "Your Name"
     email: str = ""
+    phone: str = ""
     links: str = ""
     location: str = ""
     education: str = ""
+    degree: str = ""
+    university: str = ""
+    cgpa: str = ""
     experience_years: float | None = None
     auto_confirm: bool = True
 
@@ -53,19 +57,85 @@ def get_mcp_tools():
 
 
 @router.get("/profile")
-def get_profile(user: User = Depends(current_user)):
-    return service.profile(user)
+def get_profile(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    p = service.profile(user)
+    latest_resume = (
+        db.query(Source)
+        .filter(Source.user_id == user.id, Source.type.in_(["pdf", "docx", "pptx", "note"]))
+        .order_by(Source.updated.desc())
+        .first()
+    )
+    if latest_resume and latest_resume.text:
+        from app.parsers import extract_resume_entities
+        ext = extract_resume_entities(latest_resume.text)
+        p["degree"] = ext.get("degree", "")
+        p["university"] = ext.get("university", "")
+        p["cgpa"] = ext.get("cgpa", "")
+        p["grad_years"] = ext.get("grad_years", "")
+    return p
 
 
 @router.put("/profile")
 def put_profile(p: ProfileIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
     user.name, user.links, user.location = p.name.strip(), p.links.strip(), p.location.strip()
+    if hasattr(user, "phone"):
+        user.phone = p.phone.strip()
     user.auto_confirm = int(p.auto_confirm)
-    user.education = p.education.strip()[:400]
+    if p.education:
+        user.education = p.education.strip()[:400]
+    elif p.degree or p.university:
+        parts = [p.degree.strip(), f"CGPA: {p.cgpa.strip()}" if p.cgpa else "", p.university.strip()]
+        user.education = " · ".join([pt for pt in parts if pt])[:400]
     user.experience_years = max(0.0, min(50.0, p.experience_years)) if p.experience_years is not None else None
     db.add(user)
     db.commit()
-    return service.profile(user)
+    res = service.profile(user)
+    res["degree"] = p.degree
+    res["university"] = p.university
+    res["cgpa"] = p.cgpa
+    return res
+
+
+@router.get("/profile/resume-extracted")
+def get_resume_extracted(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Return structured candidate details extracted from user's latest resume."""
+    from app.parsers import extract_resume_entities
+
+    latest_resume = (
+        db.query(Source)
+        .filter(Source.user_id == user.id, Source.type.in_(["pdf", "docx", "pptx", "note"]))
+        .order_by(Source.updated.desc())
+        .first()
+    )
+    if latest_resume and latest_resume.text:
+        data = extract_resume_entities(latest_resume.text)
+        if not data.get("name") and user.name and user.name != "Your Name":
+            data["name"] = user.name
+        if not data.get("phone") and getattr(user, "phone", ""):
+            data["phone"] = user.phone
+        if not data.get("location") and user.location:
+            data["location"] = user.location
+        if not data.get("github_user") and user.links:
+            m = re.search(r"github\.com/([a-zA-Z0-9_-]+)", user.links)
+            if m:
+                data["github_user"] = m.group(1)
+        return data
+
+    m_gh = re.search(r"github\.com/([a-zA-Z0-9_-]+)", user.links or "")
+    return {
+        "name": user.name or "",
+        "email": user.email or "",
+        "phone": getattr(user, "phone", "") or "",
+        "location": user.location or "",
+        "degree": "",
+        "university": "",
+        "cgpa": "",
+        "grad_years": "",
+        "education_summary": user.education or "",
+        "skills": [],
+        "experience": [],
+        "github_user": m_gh.group(1) if m_gh else "",
+    }
 
 
 @router.get("/activity")

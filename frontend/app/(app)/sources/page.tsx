@@ -5,6 +5,46 @@ import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { sources as seedSources, type Source } from "@/lib/data";
 
+function IconDocument({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+    </svg>
+  );
+}
+
+function IconFolder({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+    </svg>
+  );
+}
+
+function IconNotes({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+    </svg>
+  );
+}
+
+function IconShield({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+  );
+}
+
+function IconInspect({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+    </svg>
+  );
+}
+
 export default function SourcesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const st = useStore();
@@ -125,11 +165,33 @@ export default function SourcesPage() {
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       
+      {/* Technical Demonstration View Banner */}
+      <div className="p-3.5 rounded-xl bg-[#FAF9F5] border border-[#DDD7CA] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5">
+          <span className="p-1 rounded-lg bg-[#EAF4EB] text-[#1E6B38]">
+            <IconInspect className="w-4 h-4 text-[#1E6B38]" />
+          </span>
+          <div>
+            <span className="font-bold text-[#141A16]">System Architecture &amp; Verification: Source Ingestion &amp; Parsing</span>
+            <p className="text-[#556056] text-[11px] mt-0.5">
+              Multi-modal document extraction, GitHub crawler, and prompt injection guardrails.
+            </p>
+          </div>
+        </div>
+
+        <Link
+          href="/job"
+          className="px-3.5 py-1.5 bg-white hover:bg-[#FAF9F5] text-[#1E6B38] border border-[#C5E1CB] font-bold text-xs rounded-full shadow-2xs transition-all shrink-0 self-start sm:self-auto flex items-center gap-1"
+        >
+          <span>← Back to User Workflow</span>
+        </Link>
+      </div>
+
       {/* Header section */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold uppercase tracking-wider text-[#1E6B38] bg-[#EAF4EB] px-2.5 py-0.5 rounded-full border border-[#C5E1CB]">
-            Stage 1 · Source Ingestion
+            Multi-Modal Source Ingestion
           </span>
           <span className="text-xs text-[#78827A]">Multi-Modal Parsers</span>
         </div>
@@ -148,6 +210,80 @@ export default function SourcesPage() {
         </div>
       )}
 
+      {/* Candidate Profile Builder & Continuous Workspace */}
+      <div className="bg-white p-6 rounded-2xl border border-[#ECE7DD] shadow-[0_2px_14px_rgba(0,0,0,0.02)] space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#ECE7DD]">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-[#1E6B38] text-white text-lg font-bold flex items-center justify-center shadow-sm">
+              {st.profile.name ? st.profile.name.charAt(0) : "P"}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-[#141A16]">{st.profile.name || "Palak Bhatt"}</h2>
+                <span className="text-[10px] font-semibold text-[#1E6B38] bg-[#EAF4EB] border border-[#C5E1CB] px-2 py-0.5 rounded-full">
+                  Verified Candidate Profile
+                </span>
+              </div>
+              <p className="text-xs text-[#556056] mt-0.5">
+                AI &amp; Full-Stack Engineer · B.Tech Computer Science &amp; Engineering (AI/ML)
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
+            <Link
+              href="/verify"
+              className="px-4 py-2 bg-white hover:bg-[#FAF9F5] text-[#141A16] border border-[#DDD7CA] text-xs font-semibold rounded-full shadow-xs transition-all flex items-center gap-1.5"
+            >
+              <span>Inspect Fact Ledger ({st.facts.length})</span>
+            </Link>
+            <Link
+              href="/job"
+              className="px-4 py-2 bg-[#121614] hover:bg-black text-white text-xs font-semibold rounded-full shadow-sm transition-all flex items-center gap-1.5"
+            >
+              <span>Proceed to Job Match &amp; Score</span>
+              <span>→</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Profile Details & Linked Assets */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="p-3 rounded-xl bg-[#FAF9F5] border border-[#E8E3D7] space-y-1">
+            <span className="text-[10px] uppercase font-bold text-[#78827A]">Email &amp; Location</span>
+            <p className="font-semibold text-[#141A16]">{st.profile.email || "palak@skillora.ai"}</p>
+            <p className="text-[#78827A] text-[11px]">Bengaluru, India</p>
+          </div>
+          <div className="p-3 rounded-xl bg-[#FAF9F5] border border-[#E8E3D7] space-y-1">
+            <span className="text-[10px] uppercase font-bold text-[#78827A]">Verified Code Links</span>
+            <p className="font-semibold text-[#1E6B38] font-mono flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-[#141A16]" fill="currentColor" viewBox="0 0 24 24">
+                <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+              </svg>
+              <span>github.com/palakbhatt1</span>
+            </p>
+            <p className="text-[#78827A] text-[11px]">linkedin.com/in/palakbhatt</p>
+          </div>
+          <div className="p-3 rounded-xl bg-[#FAF9F5] border border-[#E8E3D7] space-y-1">
+            <span className="text-[10px] uppercase font-bold text-[#78827A]">Profile Grounding Status</span>
+            <p className="font-bold text-[#1E6B38] flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{list.length} Projects Saved in Profile</span>
+            </p>
+            <p className="text-[#78827A] text-[11px]">Persisted across all sessions</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-2">
+        <div>
+          <h3 className="text-sm font-bold uppercase tracking-wider text-[#141A16] flex items-center gap-2">
+            <span>+</span> Continuous Profile Expansion
+          </h3>
+          <p className="text-xs text-[#78827A]">Add additional codebases, documents, or project notes to expand your fact ledger</p>
+        </div>
+      </div>
+
       {/* 3 Main Source Cards */}
       <div className="grid grid-cols-1 gap-5">
         
@@ -155,8 +291,10 @@ export default function SourcesPage() {
         <div className="bg-white p-6 rounded-2xl border border-[#ECE7DD] shadow-[0_2px_14px_rgba(0,0,0,0.02)] space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#F0FDF4] border border-[#DCFCE7] flex items-center justify-center text-lg shrink-0">
-                🐙
+              <div className="w-10 h-10 rounded-xl bg-[#F0FDF4] border border-[#DCFCE7] flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-[#141A16]" fill="currentColor" viewBox="0 0 24 24">
+                  <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                </svg>
               </div>
               <div>
                 <h3 className="text-sm font-bold text-[#141A16]">GitHub Repository URL</h3>
@@ -204,8 +342,8 @@ export default function SourcesPage() {
         {/* Card 2: Document / File Upload */}
         <div className="bg-white p-6 rounded-2xl border border-[#ECE7DD] shadow-[0_2px_14px_rgba(0,0,0,0.02)] space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-lg shrink-0">
-              📄
+            <div className="w-10 h-10 rounded-xl bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] shrink-0">
+              <IconDocument className="w-5 h-5 text-[#1D4ED8]" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-[#141A16]">Upload Document (PDF, DOCX, PPTX, or TXT)</h3>
@@ -230,7 +368,9 @@ export default function SourcesPage() {
             />
 
             <div className="flex flex-col items-center justify-center space-y-1.5">
-              <span className="text-2xl">📁</span>
+              <span className="text-[#78827A]">
+                <IconFolder className="w-8 h-8 text-[#78827A]" />
+              </span>
               {selectedFile ? (
                 <div className="flex items-center gap-2">
                   <p className="text-xs sm:text-sm font-semibold text-[#1E6B38]">
@@ -277,8 +417,8 @@ export default function SourcesPage() {
         <div className="bg-white p-6 rounded-2xl border border-[#ECE7DD] shadow-[0_2px_14px_rgba(0,0,0,0.02)] space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#ECFDF5] border border-[#D1FAE5] flex items-center justify-center text-lg shrink-0">
-                📝
+              <div className="w-10 h-10 rounded-xl bg-[#ECFDF5] border border-[#D1FAE5] flex items-center justify-center text-[#1E6B38] shrink-0">
+                <IconNotes className="w-5 h-5 text-[#1E6B38]" />
               </div>
               <div>
                 <h3 className="text-sm font-bold text-[#141A16]">Project Notes & Production Metrics</h3>
@@ -339,7 +479,9 @@ export default function SourcesPage() {
 
         {list.length === 0 ? (
           <div className="py-12 text-center space-y-2">
-            <span className="text-3xl">📥</span>
+            <div className="flex justify-center text-[#78827A]">
+              <IconDocument className="w-8 h-8 text-[#78827A]" />
+            </div>
             <p className="font-bold text-sm text-[#141A16]">No sources added yet</p>
             <p className="text-xs text-[#556056] max-w-sm mx-auto">
               Add a GitHub repository, upload a document, or paste project notes above to extract verified facts into your ledger.
@@ -350,8 +492,18 @@ export default function SourcesPage() {
             {list.map((src) => (
               <div key={src.id} className="py-3 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-8 h-8 rounded-lg bg-[#FAF9F5] border border-[#E5E1D5] flex items-center justify-center text-xs font-bold text-[#1E6B38] uppercase shrink-0">
-                    {src.type}
+                  <span className="w-9 h-9 rounded-xl bg-white border border-[#E5E1D5] shadow-xs flex items-center justify-center shrink-0">
+                    {src.type === "github" ? (
+                      <svg className="w-4 h-4 text-[#141A16]" fill="currentColor" viewBox="0 0 24 24">
+                        <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                      </svg>
+                    ) : src.type === "pdf" ? (
+                      <IconDocument className="w-4 h-4 text-[#1D4ED8]" />
+                    ) : src.type === "docx" || src.type === "pptx" ? (
+                      <IconNotes className="w-4 h-4 text-[#1E6B38]" />
+                    ) : (
+                      <IconDocument className="w-4 h-4 text-[#78827A]" />
+                    )}
                   </span>
                   <div className="truncate">
                     <p className="text-xs sm:text-sm font-bold text-[#141A16] truncate">{src.name}</p>
@@ -374,17 +526,26 @@ export default function SourcesPage() {
       {/* Security & Prompt Injection Assurance */}
       <div className="pt-2 pb-6 flex flex-col sm:flex-row items-center justify-between text-xs text-[#78827A] gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-[#1E6B38]">🛡️</span>
+          <IconShield className="w-4 h-4 text-[#1E6B38]" />
           <span>Protected by multi-tier prompt injection guardrails (Section 7)</span>
         </div>
 
-        <Link
-          href="/verify"
-          className="text-xs sm:text-sm font-bold text-[#1E6B38] hover:underline flex items-center gap-1"
-        >
-          <span>Proceed to Fact Verification</span>
-          <span>→</span>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/verify"
+            className="text-xs font-semibold text-[#556056] hover:text-[#141A16] flex items-center gap-1"
+          >
+            <span>Inspect Fact Ledger</span>
+          </Link>
+          <span className="text-slate-300">•</span>
+          <Link
+            href="/job"
+            className="px-5 py-2 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs shadow-sm transition-all flex items-center gap-1.5"
+          >
+            <span>Proceed to Job Match &amp; Score</span>
+            <span>→</span>
+          </Link>
+        </div>
       </div>
 
     </div>

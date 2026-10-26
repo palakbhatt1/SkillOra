@@ -58,6 +58,104 @@ def bulk(b: BulkIn, db: Session = Depends(get_db), user: User = Depends(current_
     return {"updated": n}
 
 
+@router.delete("/{fid}")
+def delete_fact(fid: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    f = get_user_fact(db, fid, user)
+    db.delete(f)
+    db.commit()
+    return {"deleted": fid}
+
+
+class FactCreate(BaseModel):
+    project: str
+    category: str = "experience"
+    text: str
+    span: str = ""
+    status: str = "verified"
+
+
+@router.post("")
+def create_fact(b: FactCreate, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    f = Fact(
+        user_id=user.id,
+        seq=next_seq(db, user.id),
+        source_id=None,
+        text=b.text.strip(),
+        span=b.span.strip(),
+        project=b.project.strip(),
+        category=b.category,
+        status=b.status,
+        declared=0,
+    )
+    db.add(f)
+    db.commit()
+    return service.fact_api(f)
+
+
+class ProjectActionIn(BaseModel):
+    project: str
+
+
+@router.post("/project/verify")
+def verify_project_all(b: ProjectActionIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Mark all facts for a project as verified."""
+    target = b.project.strip().lower()
+    facts = service.all_facts(db, user.id, include_rejected=True)
+    count = 0
+    for f in facts:
+        p_name = (f.project or "").lower()
+        s_name = (f.source.name if f.source else "").lower()
+        if target in p_name or target in s_name or (s_name.split("/")[-1] == target):
+            f.status = "verified"
+            f.auto = 0
+            count += 1
+    db.commit()
+    return {"updated": count, "project": b.project, "status": "verified"}
+
+
+@router.post("/project/unverify")
+def unverify_project_all(b: ProjectActionIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Mark all facts for a project as pending."""
+    target = b.project.strip().lower()
+    facts = service.all_facts(db, user.id, include_rejected=True)
+    count = 0
+    for f in facts:
+        p_name = (f.project or "").lower()
+        s_name = (f.source.name if f.source else "").lower()
+        if target in p_name or target in s_name or (s_name.split("/")[-1] == target):
+            f.status = "pending"
+            f.auto = 0
+            count += 1
+    db.commit()
+    return {"updated": count, "project": b.project, "status": "pending"}
+
+
+@router.delete("/project/{project_name}")
+def delete_project_facts(project_name: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Delete a project and all associated facts and sources."""
+    target = project_name.strip().lower()
+    # Check sources
+    sources = db.query(Source).filter(Source.user_id == user.id).all()
+    deleted_sources = 0
+    for s in sources:
+        s_base = s.name.split("/")[-1].lower()
+        if target == s.name.lower() or target == s_base or target in s_base:
+            db.delete(s)
+            deleted_sources += 1
+
+    # Check any leftover facts with matching project name
+    facts = db.query(Fact).filter(Fact.user_id == user.id).all()
+    deleted_facts = 0
+    for f in facts:
+        p_base = (f.project or "").split("/")[-1].lower()
+        if target == (f.project or "").lower() or target == p_base or target in p_base:
+            db.delete(f)
+            deleted_facts += 1
+
+    db.commit()
+    return {"ok": True, "project": project_name, "deleted_sources": deleted_sources, "deleted_facts": deleted_facts}
+
+
 @router.post("/declare")
 def declare(b: DeclareIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
     """Self-declared skill: counts in the score at lower weight, never used to write a project bullet."""
@@ -75,3 +173,4 @@ def declare(b: DeclareIn, db: Session = Depends(get_db), user: User = Depends(cu
     db.add(f)
     db.commit()
     return service.fact_api(f)
+

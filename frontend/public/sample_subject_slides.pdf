@@ -1,0 +1,52 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 819 >>
+stream
+BT
+/F1 12 Tf
+50 750 Td
+16 TL
+(Slide 1: CS 401: Operating Systems & Distributed Computing) '
+(Module 4: Process Synchronization & Concurrency Control) '
+(Instructor: Prof. K. R. Sharma, Department of Computer Science) '
+() '
+(Slide 2: Lecture Learning Objectives & Agenda) '
+(- Understanding critical section problem and race conditions) '
+(- Mutex locks, semaphores, and condition variables) '
+(- Deadlock avoidance: Coffman conditions & Bankers Algorithm) '
+() '
+(Slide 3: Course Syllabus & Grading Scheme) '
+(Required Textbook: Silberschatz - Operating System Concepts \(10th Edition\)) '
+(Midterm Exam: 30% | Homework Assignments: 20% | Final Exam: 50%) '
+() '
+(Slide 4: Questions & Discussion) '
+(Office Hours: Tuesdays and Thursdays 3:00 PM - 5:00 PM) '
+(Any questions? Thank you for attending today session!) '
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001111 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1181
+%%EOF

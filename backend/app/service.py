@@ -287,4 +287,5 @@ def job_view(db: Session, job: Job) -> dict:
 
 
 def profile(user: User) -> dict:
-    return {"name": user.name or "Your Name", "email": user.email, "links": user.links, "location": user.location, "auto_confirm": bool(user.auto_confirm), "education": user.education or "", "experience_years": user.experience_years}
+    return {"name": user.name or "Your Name", "email": user.email, "links": user.links, "location": user.location, "phone": getattr(user, "phone", "") or "", "auto_confirm": bool(user.auto_confirm), "education": user.education or "", "experience_years": user.experience_years}
+

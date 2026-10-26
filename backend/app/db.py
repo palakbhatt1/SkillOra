@@ -18,6 +18,7 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(200), default="")
     links: Mapped[str] = mapped_column(String(300), default="")
     location: Mapped[str] = mapped_column(String(200), default="")
+    phone: Mapped[str] = mapped_column(String(50), default="")
     experience_years: Mapped[float | None] = mapped_column(Float, nullable=True)  # optional; the experience part is only scored if known
     education: Mapped[str] = mapped_column(String(400), default="")  # "B.Tech CSE (AI), BML Munjal University, 2023-2027"
     auto_confirm: Mapped[int] = mapped_column(Integer, default=1)  # 1 = facts from my own files are confirmed on arrival (review by exception)
