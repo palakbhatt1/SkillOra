@@ -38,6 +38,16 @@ function IconDocument({ className = "w-5 h-5" }: { className?: string }) {
   );
 }
 
+import AgentArchitectureModal from "@/components/AgentArchitectureModal";
+
+function IconNetwork({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM9 20a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2zM7 10v4a2 2 0 002 2h6a2 2 0 002-2v-4" />
+    </svg>
+  );
+}
+
 function IconInspect({ className = "w-3.5 h-3.5" }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -50,6 +60,7 @@ export default function FacultyPage() {
   const st = useStore();
   const [showRequirements, setShowRequirements] = useState(false);
   const [showAgentPanel, setShowAgentPanel] = useState(false);
+  const [showArchitectureModal, setShowArchitectureModal] = useState(false);
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
@@ -72,12 +83,23 @@ export default function FacultyPage() {
           </p>
         </div>
 
-        <Link
-          href="/job"
-          className="px-6 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs sm:text-sm shadow-md transition-all shrink-0 flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
-        >
-          <span>← Back to User Workspace</span>
-        </Link>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowArchitectureModal(true)}
+            className="px-4 py-2.5 bg-[#EAF4EB] hover:bg-[#D5EBD7] text-[#1E6B38] border border-[#C5E1CB] rounded-full font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <IconNetwork className="w-3.5 h-3.5 text-[#1E6B38]" />
+            <span>Agent Architecture &amp; Flowcharts</span>
+          </button>
+
+          <Link
+            href="/job"
+            className="px-5 py-2.5 bg-[#121614] hover:bg-black text-white rounded-full font-bold text-xs sm:text-sm shadow-md transition-all shrink-0 flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+          >
+            <span>← Back to Workspace</span>
+          </Link>
+        </div>
       </div>
 
       {/* 4 Technical Pillar Cards Grid */}
@@ -226,6 +248,11 @@ export default function FacultyPage() {
       {/* 11 Requirements Modal */}
       {showRequirements && (
         <RequirementsModal isOpen={showRequirements} onClose={() => setShowRequirements(false)} />
+      )}
+
+      {/* Agent Architecture & Flowcharts Modal */}
+      {showArchitectureModal && (
+        <AgentArchitectureModal isOpen={showArchitectureModal} onClose={() => setShowArchitectureModal(false)} />
       )}
 
     </div>
